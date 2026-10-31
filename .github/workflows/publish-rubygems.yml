@@ -76,10 +76,90 @@ jobs:
           ruby -rrubygems/package -e 's = Gem::Package.new("package/lunixi-sdk-#{ENV.fetch("VERSION")}.gem").spec; abort "Wrong packaged identity" unless s.name == "lunixi-sdk" && s.version.to_s == ENV.fetch("VERSION")'
           git diff --exit-code
           sha256sum "package/lunixi-sdk-${VERSION}.gem"
-      - name: Authenticate using the pending or existing RubyGems publisher
-        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
-        with:
-          trusted-publisher: 'true'
+      - name: Authenticate for the approved immutable RubyGems owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime, http.client, json, os, re, stat, sys, urllib.parse
+
+          class AuthenticationError(Exception):
+              pass
+
+          def mask(value):
+              if isinstance(value, str) and value:
+                  escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print("::add-mask::" + escaped, flush=True)
+
+          def request_json(host, path, method, headers, body, expected_status, label):
+              # HTTPSConnection verifies TLS and never follows redirects or uses proxy envs.
+              connection = http.client.HTTPSConnection(host, timeout=20)
+              try:
+                  connection.request(method, path, body=body, headers=headers)
+                  response = connection.getresponse()
+                  if response.status != expected_status:
+                      raise AuthenticationError(label + " returned HTTP " + str(response.status))
+                  if response.getheader("Content-Type", "").split(";", 1)[0].lower() != "application/json":
+                      raise AuthenticationError(label + " returned an unexpected content type")
+                  raw = response.read(65537)
+                  if len(raw) > 65536:
+                      raise AuthenticationError(label + " response exceeded its bound")
+                  result = json.loads(raw)
+                  if not isinstance(result, dict):
+                      raise AuthenticationError(label + " returned invalid JSON structure")
+                  return result
+              finally:
+                  connection.close()
+
+          try:
+              request_token = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
+              mask(request_token)
+              if not re.fullmatch(r"[\x21-\x7e]{16,16384}", request_token):
+                  raise AuthenticationError("GitHub OIDC request credential is invalid")
+              endpoint = urllib.parse.urlsplit(os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"])
+              if (endpoint.scheme != "https" or not endpoint.hostname
+                      or not endpoint.hostname.endswith(".actions.githubusercontent.com")
+                      or endpoint.port not in (None, 443) or endpoint.username or endpoint.password or endpoint.fragment):
+                  raise AuthenticationError("GitHub OIDC endpoint is invalid")
+              query = [(key, value) for key, value in urllib.parse.parse_qsl(endpoint.query, keep_blank_values=True) if key != "audience"]
+              query.append(("audience", "rubygems.org"))
+              path = (endpoint.path or "/") + "?" + urllib.parse.urlencode(query)
+              identity = request_json(endpoint.hostname, path, "GET",
+                  {"Authorization": "Bearer " + request_token, "Accept": "application/json"},
+                  None, 200, "GitHub OIDC request")
+              jwt = identity.get("value")
+              mask(jwt)
+              if not isinstance(jwt, str) or not 64 <= len(jwt) <= 16384 or not re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", jwt):
+                  raise AuthenticationError("GitHub OIDC token is malformed")
+              # Numeric owner must be a JSON STRING; RubyGems resolves it as an immutable ID.
+              body = json.dumps({"jwt": jwt, "owner": "255358"}).encode("utf-8")
+              result = request_json("rubygems.org", "/api/v1/oidc/trusted_publisher/exchange_token", "POST",
+                  {"Content-Type": "application/json", "Accept": "application/json"},
+                  body, 201, "RubyGems owner-bound exchange")
+              key = result.get("rubygems_api_key")
+              mask(key)
+              if not isinstance(key, str) or not re.fullmatch(r"rubygems_[0-9a-f]{48}", key):
+                  raise AuthenticationError("RubyGems returned an invalid credential")
+              if result.get("scopes") != ["push_rubygem"]:
+                  raise AuthenticationError("RubyGems credential is not restricted to gem push")
+              expires_at = result.get("expires_at")
+              if not isinstance(expires_at, str):
+                  raise AuthenticationError("RubyGems credential expiry is missing")
+              expires = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+              if expires.tzinfo is None or not datetime.timedelta(0) < expires - datetime.datetime.now(datetime.timezone.utc) <= datetime.timedelta(minutes=16):
+                  raise AuthenticationError("RubyGems credential expiry is outside the short-lived bound")
+              descriptor = os.open(os.environ["GITHUB_ENV"], os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+              with os.fdopen(descriptor, "a", encoding="utf-8") as output:
+                  if not stat.S_ISREG(os.fstat(output.fileno()).st_mode):
+                      raise AuthenticationError("Runner environment file is invalid")
+                  os.fchmod(output.fileno(), 0o600)
+                  output.write("GEM_HOST_API_KEY=" + key + "\n")
+              print("Owner-bound, push-only RubyGems credential configured; expires within 16 minutes.")
+          except AuthenticationError as error:
+              sys.exit("RubyGems OIDC authentication failed: " + str(error) + ". No response body was logged.")
+          except Exception:
+              sys.exit("RubyGems OIDC authentication failed. No response body or exception details were logged.")
+          PY
       - name: Publish the verified gem
         run: gem push --host https://rubygems.org "package/lunixi-sdk-${VERSION}.gem"
       - name: Remove ephemeral runner credentials
