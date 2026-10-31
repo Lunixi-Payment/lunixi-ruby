@@ -10,27 +10,22 @@ class OrdersController < ApplicationController
   end
 
   def checkout
-    @order.with_lock do
-      return redirect_to order_path(@order.public_id), status: :see_other if @order.status == 'paid'
+    return redirect_to order_path(@order.public_id), status: :see_other if @order.status == 'paid'
 
-      unless @order.checkout_token.present?
-        payload = LunixiConnection.client.payments.create_intent(
-          { amount: @order.amount_minor, currency: @order.currency, orderId: @order.public_id,
-            callbackUrl: callback_url, metadata: { allowedOrigin: 'https://pay.lunixi.com' } }, idempotency_key: @order.checkout_key
-        ).fetch('data')
-        token = payload.fetch('token')
-        identifiers = payload.values_at('paymentId', 'intentId').compact
-        intent_id = identifiers.first
-        raise Lunixi::Error, 'Conflicting checkout identifiers' unless identifiers.uniq.one?
-        unless token.is_a?(String) && token.match?(/\A[A-Za-z0-9_.~-]{16,4096}\z/) && intent_id.is_a?(String) && intent_id.match?(/\A[a-zA-Z0-9_-]{1,256}\z/)
-          raise Lunixi::Error, 'Unexpected checkout response'
-        end
-
-        @order.update!(checkout_token: token, intent_id: intent_id)
-      end
-      redirect_to HostedCheckout.url(@order.checkout_token), allow_other_host: true, status: :see_other
+    form_actions = CheckoutPolicy.form_action_sources
+    CheckoutFlow.new(@order).start(callback_url, ENV.fetch('LUNIXI_CHECKOUT_MODE', 'embedded'))
+    response.headers['Cache-Control'] = 'private, no-store'
+    if @order.checkout_mode == 'hosted'
+      redirect_to HostedCheckout.url(@order.payment_page_url), allow_other_host: true, status: :see_other
+    else
+      @checkout_config = Lunixi::Checkout.browser_config(@order.checkout_token)
+      @checkout_nonce = SecureRandom.base64(18)
+      response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'nonce-#{@checkout_nonce}' https://cdn.lunixi.com; " \
+                                                    "frame-src https://*.lunixi.com; connect-src 'self' https://*.lunixi.com; " \
+                                                    "form-action 'self' #{form_actions}; frame-ancestors 'none'; base-uri 'none'"
+      render :payment
     end
-  rescue Lunixi::Error, KeyError
+  rescue Lunixi::Error, KeyError, JSON::ParserError
     render plain: I18n.t('checkout.unavailable'), status: :service_unavailable
   end
 

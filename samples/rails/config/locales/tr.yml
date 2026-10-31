@@ -1,5 +1,6 @@
 tr:
   checkout:
+    javascript_required: "Güvenli ödeme formunu yüklemek için JavaScript kullanın."
     title: "Lunixi ödeme örneği"
     amount: "Sipariş toplamı"
     pay: "Lunixi ile öde"

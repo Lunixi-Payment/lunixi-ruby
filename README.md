@@ -10,14 +10,14 @@ Server-side Ruby client for Lunixi payments, fraud and signed gateway requests. 
 
 Ruby **3.3+**, OpenSSL with **Ed25519** support, and Bundler. The runnable Rails sample uses **Rails 8.1** and SQLite. The core gem does not depend on Rails.
 
-Version **0.1.1** is distributed as source here. RubyGems publication is a separate release step; this guide does not assume a published registry package.
+Version **0.1.2** is distributed as source here. RubyGems publication is a separate release step; this guide does not assume a published registry package.
 
 ```bash
 git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.1.gem
+gem install ./lunixi-sdk-0.1.2.gem
 ```
 
 Inside this checkout, `bundle exec ruby …` loads the local gem. An application can use a reviewed checkout with `gem 'lunixi-sdk', path: '/absolute/path/to/lunixi-ruby'`. Pin an audited commit when using a Bundler Git source. Never use an unpinned moving branch for a production deployment.
@@ -68,12 +68,12 @@ intent_id = result.fetch('data').fetch('paymentId')
 checkout_token = result.fetch('data').fetch('token')
 # Persist the intent id and encrypt the checkout token at rest.
 # The Rails sample validates the token and builds a fixed-origin redirect:
-# https://pay.lunixi.com/payment/<token>
+# Optional hosted checkout uses the validated backend paymentPageUrl, never a URL built from this token.
 ```
 
 Response envelopes are retained as received. An HTTP 2xx response, an intent/token, a return URL or an intermediate split state **does not mean funds were captured**. Confirm a verified payment webhook and reconcile the persisted intent, order reference, currency, amount and final status before fulfillment.
 
-The hosted Lunixi form owns enabled payment methods and supports the methods configured for the merchant, including eligible alternative methods and multi-card flows. Availability remains merchant/account dependent. Do not collect PAN/CVV through this SDK. The Rails example demonstrates fixed-total single-intent checkout; adapt accounting and final settlement checks before enabling split settlement, customer-paid insurance or surcharges in that example.
+The shared Lunixi form owns enabled payment methods and supports the methods configured for the merchant, including eligible alternative methods and multi-card flows. Availability remains merchant/account dependent. Do not collect PAN/CVV through this SDK. The Rails example demonstrates fixed-total single-intent checkout; adapt accounting and final settlement checks before enabling split settlement, customer-paid insurance or surcharges in that example.
 
 ## API coverage
 
@@ -101,7 +101,7 @@ lunixi.payments.refund('intent_123', amount: 2_500,
 links = lunixi.request('GET', '/api/v1/payments/links', query: { limit: 20 })
 ```
 
-Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 0.1.1 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
+Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 0.1.2 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
 
 ## Raw-body webhooks and durable deduplication
 
@@ -147,3 +147,15 @@ gem build lunixi-sdk.gemspec
 The SDK suite includes RFC 8032 Ed25519 and shared webhook vectors, tampering, replay/rotation, money validation, concurrent token caching, exact transmitted signatures, safe retries, and real local TLS certificate/hostname/redirect/size checks. JSON compatibility tests use Node.js as an independent implementation. Rails tests use synthetic transport fixtures and a real SQLite database; they move no funds. CI runs these checks on Ruby 3.3 and 3.4. Brakeman has one narrowly documented fixed-origin redirect false positive in `samples/rails/config/brakeman.ignore`, covered by redirect-injection tests; no broad rule is disabled.
 
 Security: [SECURITY.md](SECURITY.md) · Contributions: [CONTRIBUTING.md](CONTRIBUTING.md) · Changes: [CHANGELOG.md](CHANGELOG.md) · MIT [license](LICENSE). Support: developer@lunixi.com.
+
+## On-site form and optional hosted checkout
+
+The Rails example defaults to `LUNIXI_CHECKOUT_MODE=embedded`. It renders the existing Lunixi form on the merchant page using the fixed official CDN, HTML-escaped JSON data attributes and a per-response CSP nonce. `Lunixi::Checkout.browser_config(token)` provides only the official object/mount configuration. No gateway HTML or merchant secrets are rendered.
+
+Set `LUNIXI_CHECKOUT_MODE=hosted` explicitly for optional redirect. `Lunixi::Checkout.payment_page_url(data.fetch('paymentPageUrl'))` and the Rails redirect wrapper validate the exact backend URL: HTTPS `pay.lunixi.com/payment/` followed by a 16–4096-character ASCII opaque value, with no userinfo, port, query, fragment or controls. It can differ from the embedded token. Do not construct a URL from that token. Both modes expose the same merchant-enabled form methods, multi-card, installments and insurance; these features do not require redirecting. The existing fixed-total single-intent settlement limitation still applies.
+
+Run `rails db:migrate` before deploying 0.1.2. New request/mode/callback and start time are persisted before network I/O; request/token/backend URL use Active Record Encryption. Retries reuse the saved body and key and stop financial dispatch after 23 hours. Existing rows are marked legacy hosted; unknown legacy requests or missing backend URLs remain reconciliation-only, without rewriting origin, resetting a key or inventing a URL. Global mode changes affect new reservations; existing requests retain their saved presentation. CSRF/demo authorization, raw webhooks, native receipt transactions and the bounded 3DS/split return adapter remain unchanged.
+
+Focused 0.1.2 verification: 24 Rails form/return/URL/CSP security tests with 225 assertions, 2 SDK helper tests with 5 assertions, RuboCop and Brakeman (one exact documented strict-URL redirect false positive). Prior full 0.1.1 results remain the baseline; live/merchant acceptance is deferred.
+
+The checkout page’s CSP permits form POSTs only to `'self'` and the configured gateway origin (default `https://api-gateway.lunixi.com`). This preserves wallet/provider and legacy POST handoffs supported by the browser SDK. For another reviewed provider, set server-only `LUNIXI_FORM_ACTION_ORIGINS` to a comma-separated list of exact HTTPS origins, without spaces, paths, trailing slashes, credentials, query, fragment or wildcards. Invalid configuration fails closed; gateway responses and browser fields never expand this list. Script nonces, frame/connect restrictions and informational return handling remain in force.

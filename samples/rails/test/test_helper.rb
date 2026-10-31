@@ -23,6 +23,9 @@ require_relative 'fake_payments'
 
 class RailsFlowTest < ActionDispatch::IntegrationTest
   setup do
+    ENV['LUNIXI_CHECKOUT_MODE'] = 'embedded'
+    ENV.delete('LUNIXI_FORM_ACTION_ORIGINS')
+    ENV.delete('LUNIXI_BASE_URL')
     LunixiReceipt.delete_all
     Order.delete_all
     @order = Order.create!(amount_minor: 10_050, currency: 'TRY')

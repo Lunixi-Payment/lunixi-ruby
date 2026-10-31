@@ -3,12 +3,25 @@
     {
       "warning_type": "Redirect",
       "warning_code": 18,
-      "fingerprint": "5b80fb44444c60f3b126286e000e9bb0d2e2dee774386df00ccc2609cb18c304",
+      "fingerprint": "1177223743faf23700854c7b167c1945096f798c06511ea52326716838b6cfad",
       "check_name": "Redirect",
       "message": "Possible unprotected redirect",
       "file": "app/controllers/orders_controller.rb",
-      "line": 29,
-      "note": "Reviewed fixed-origin hosted checkout redirect. HostedCheckout.url validates both fresh and stored tokens against an anchored ASCII allowlist, then constructs URI::HTTPS with literal host pay.lunixi.com. No caller supplies scheme, host or delimiters. HostedCheckoutTest and CheckoutTest cover hostile stored tokens and redirect injection. Re-review this fingerprint on changes."
+      "line": 18,
+      "link": "https://brakemanscanner.org/docs/warning_types/redirect/",
+      "code": "redirect_to(HostedCheckout.url(Order.find_by!(:public_id => params[:public_id]).payment_page_url), :allow_other_host => true, :status => :see_other)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "OrdersController",
+        "method": "checkout"
+      },
+      "user_input": "Order.find_by!(:public_id => params[:public_id]).payment_page_url",
+      "confidence": "Weak",
+      "cwe_id": [
+        601
+      ],
+      "note": "Reviewed exact backend paymentPageUrl redirect: HostedCheckout.url delegates to Lunixi::Checkout.payment_page_url, which fully anchors HTTPS pay.lunixi.com/payment/ plus an ASCII opaque16..4096-character path with no query, fragment, userinfo, port or controls. Both fresh gateway URLs and encrypted stored URLs are revalidated. CheckoutTest proves foreign stored hosts and malicious fresh URLs cannot redirect; HostedCheckoutTest rejects delimiter/host/control injection. The allowed path is independent of the embedded browser token. This exception matches only this redirect fingerprint; no blanket exclusion."
     }
   ],
   "updated": "2026-10-31"

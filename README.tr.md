@@ -10,14 +10,14 @@ Lunixi ödemeleri, fraud işlemleri ve imzalı gateway çağrıları için sunuc
 
 Ruby **3.3+**, **Ed25519** destekli OpenSSL ve Bundler gerekir. Çalıştırılabilir örnek **Rails 8.1** ve SQLite kullanır; ana gem Rails’e bağımlı değildir.
 
-**0.1.1** sürümü burada kaynak kod olarak dağıtılır. RubyGems yayını ayrı bir sürüm adımıdır; aşağıdaki kurulum kayıt deposunda yayımlanmış paket olduğunu varsaymaz.
+**0.1.2** sürümü burada kaynak kod olarak dağıtılır. RubyGems yayını ayrı bir sürüm adımıdır; aşağıdaki kurulum kayıt deposunda yayımlanmış paket olduğunu varsaymaz.
 
 ```bash
 git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.1.gem
+gem install ./lunixi-sdk-0.1.2.gem
 ```
 
 Bu dizinde `bundle exec ruby …` yerel SDK’yı yükler. Uygulamanızın Gemfile’ında incelenmiş bir kopyayı `gem 'lunixi-sdk', path: '/tam/yol/lunixi-ruby'` ile kullanabilirsiniz. Bundler Git kaynağı kullanırken denetlenmiş commit’i sabitleyin.
@@ -60,7 +60,7 @@ checkout_token = result.fetch('data').fetch('token')
 
 `10_050`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif ve JavaScript güvenli tam sayı aralığında olmalıdır; float/string kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
 
-Intent ve checkout token’ını saklayın; token’ı veritabanında şifreleyin. Rails örneği doğrulanmış token ile sabit `https://pay.lunixi.com/payment/<token>` adresini kurar. Aktif ödeme yöntemlerini Lunixi formu ve üye işyeri ayarları belirler; uygun alternatif yöntemler ve çoklu kart akışı formda sunulur. SDK üzerinden PAN/CVV toplamayın.
+Varsayılan form mağaza içinde açılır; isteğe bağlı yönlendirme yalnız doğrulanmış backend `paymentPageUrl` adresini kullanır. Token ve adres şifrelenir; iki mod aynı Lunixi form ayarlarını paylaşır. PAN/CVV toplamayın.
 
 HTTP 2xx, token, dönüş sayfası veya devam eden split durumu tahsilat kanıtı değildir. Doğrulanmış webhook ve sunucudan durum sorgusunda intent, sipariş, para birimi, toplam ve nihai durum uyuşmadan siparişi ödenmiş saymayın. Rails örneği sabit toplamlı tek intent’i gösterir; split tahsilat, müşteriye yansıtılan sigorta veya ek ücret açmadan önce mutabakat muhasebesini genişletin.
 
@@ -120,3 +120,15 @@ gem build lunixi-sdk.gemspec
 Testler gerçek para taşımaz. RFC 8032 ve ortak webhook vektörleri, bozulmuş imza, replay/rotasyon, tutar doğruluğu, eşzamanlı token, aynı anahtarla retry ve gerçek yerel TLS sertifika/hostname/yönlendirme/boyut kontrolleri kapsanır. JSON uyumu bağımsız Node.js ile karşılaştırılır. Rails testi gerçek SQLite transaction’larını kullanır. Brakeman’da sabit host yönlendirmesi için tek, gerekçeli ve test edilmiş false positive `samples/rails/config/brakeman.ignore` içinde yer alır.
 
 [Güvenlik](SECURITY.md) · [Katkı](CONTRIBUTING.md) · [Değişiklikler](CHANGELOG.md) · [MIT lisansı](LICENSE) · developer@lunixi.com
+
+## Mağaza içi form ve isteğe bağlı yönlendirme
+
+Rails örneğinde varsayılan `LUNIXI_CHECKOUT_MODE=embedded` değeridir. Mevcut Lunixi formu sabit resmi CDN, HTML için kaçırılmış JSON data attribute ve yanıta özgü CSP nonce ile mağaza sayfasında açılır. `Lunixi::Checkout.browser_config(token)` yalnız resmi object/mount yapılandırmasını verir; gateway HTML'i veya merchant secret'ı basılmaz.
+
+İsteğe bağlı yönlendirme için açıkça `LUNIXI_CHECKOUT_MODE=hosted` seçin. `Lunixi::Checkout.payment_page_url(data.fetch('paymentPageUrl'))` backend adresini birebir doğrular: HTTPS `pay.lunixi.com/payment/` ve 16–4096 karakter ASCII opak değer; userinfo, port, sorgu, fragment veya kontrol karakteri kabul edilmez. Bu değer gömülü token'dan farklı olabilir; token'dan URL üretilmez. İki mod aynı açık yöntemleri, çoklu kartı, taksiti ve sigortayı sunar; yönlendirme şart değildir. Sabit toplamlı tek-intent tahsilat sınırlaması korunur.
+
+0.1.2'yi açmadan önce `rails db:migrate` çalıştırın. Yeni istek/mod/dönüş adresi/zaman ağdan önce kaydedilir; gövde, token ve backend adresi Active Record Encryption ile şifrelenir. Tekrar aynı gövde/anahtarla gider; 23 saatten eski finansal gönderim durur. Mevcut satırlar eski hosted akışı olarak işaretlenir; bilinmeyen eski istek veya eksik backend adresi origin/anahtar değiştirilmeden ve adres üretilmeden mutabakat bekler. Genel mod değişikliği yeni rezervasyonlara uygulanır; mevcut istek kayıtlı modunu korur. CSRF/demo yetkisi, ham webhook, atomik receipt ve sınırlı 3DS/çoklu kart dönüşü korunur.
+
+0.1.2 odaklı kontrolü: 24 Rails form/dönüş/URL/CSP güvenlik testi ve 225 assertion, 2 SDK yardımcı testi ve 5 assertion, RuboCop ve Brakeman (belgeli tek strict-URL yönlendirme false positive'i). Önceki tam 0.1.1 sonuçları temel kanıttır; canlı/merchant kabulü ertelenmiştir.
+
+Checkout sayfasının CSP’si form POST’u için yalnız `'self'` ve yapılandırılan gateway origin’ine (varsayılan `https://api-gateway.lunixi.com`) izin verir. Böylece tarayıcı SDK’sının desteklediği cüzdan/sağlayıcı ve eski POST geçişleri korunur. İncelenmiş başka bir sağlayıcı gerekiyorsa yalnız sunucuda `LUNIXI_FORM_ACTION_ORIGINS` tanımlayın: virgülle ayrılmış tam HTTPS origin’leri; boşluk, yol, sondaki slash, kullanıcı bilgisi, sorgu, fragment ve wildcard kabul edilmez. Geçersiz ayar reddedilir; gateway yanıtı veya tarayıcı alanı listeyi genişletemez. Script nonce, frame/connect sınırları ve bilgilendirici dönüş güvenliği korunur.

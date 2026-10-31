@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="<%= I18n.locale %>">
+<head><meta charset="utf-8"><title><%= t('checkout.title') %></title><%= csrf_meta_tags %></head>
+<body>
+  <main>
+    <h1><%= t('checkout.title') %></h1>
+    <div id="lunixi-checkout-form" data-lunixi-config="<%= @checkout_config.to_json %>"></div>
+    <noscript><%= t('checkout.javascript_required') %></noscript>
+  </main>
+  <script src="https://cdn.lunixi.com/lunixi-checkout.min.js" nonce="<%= @checkout_nonce %>"></script>
+  <script nonce="<%= @checkout_nonce %>">
+    const config = JSON.parse(document.getElementById('lunixi-checkout-form').dataset.lunixiConfig);
+    Lunixi.checkout.create(config).mount('#lunixi-checkout-form');
+  </script>
+</body>
+</html>

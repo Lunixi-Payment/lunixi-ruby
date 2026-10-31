@@ -2,7 +2,7 @@
 
 # This runnable sample represents one merchant and fixed-total TRY orders.
 class Order < ApplicationRecord
-  encrypts :checkout_token
+  encrypts :checkout_token, :payment_page_url, :checkout_request
   before_validation :assign_identifiers, on: :create
   validates :public_id, :checkout_key, presence: true, uniqueness: true
   validates :amount_minor, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: Lunixi::JsonBody::MAX_SAFE_INTEGER }

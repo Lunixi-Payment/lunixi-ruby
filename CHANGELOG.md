@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2 — 2026-10-31
+
+- Add strict backend payment-page URL and official embedded-form configuration helpers, without rebuilding hosted URLs from tokens.
+- Default the Rails example to an on-site CDN-mounted form with escaped JSON, nonce CSP and optional explicit hosted mode.
+- Freeze and encrypt request/mode before network dispatch, cache encrypted backend URLs, retain original uncertain keys/bodies and fence replay at 23 hours.
+- Add an explicit migration preserving pre-existing orders as legacy hosted attempts; unknown legacy requests or missing URLs require reconciliation rather than a new charge.
+- Preserve nonce CSP while allowing exact operator-approved HTTPS form-action origins for provider/legacy POSTs; reject unsafe origin configuration before use.
+
+
 ## 0.1.1 — 2026-10-31
 
 - Add a bounded stateless Rails POST return adapter before parameter/session processing. It ignores gateway browser fields and redirects to the existing authenticated GET; checkout CSRF remains required.

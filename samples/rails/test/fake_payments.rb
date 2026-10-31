@@ -14,7 +14,7 @@ class FakePayments
     @intents << [body, idempotency_key]
     raise Lunixi::TransportError, 'synthetic connection failure' if @failure
 
-    { 'data' => @checkout_response || { 'token' => 'checkout_TOKEN_synthetic_123', 'paymentId' => 'intent_123' } }
+    { 'data' => @checkout_response || { 'token' => 'checkout_TOKEN_synthetic_123', 'paymentId' => 'intent_123', 'paymentPageUrl' => 'https://pay.lunixi.com/payment/server-issued-page-0123456789' } }
   end
 
   def get(id)

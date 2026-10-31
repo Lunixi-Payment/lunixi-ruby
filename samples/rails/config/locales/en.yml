@@ -1,5 +1,6 @@
 en:
   checkout:
+    javascript_required: "Enable JavaScript to load the secure payment form."
     title: "Lunixi checkout example"
     amount: "Order total"
     pay: "Pay with Lunixi"

@@ -30,7 +30,7 @@ module Lunixi
       client.request('GET', BASE, query: filters, signed: false)
     end
 
-    # Return merchant-enabled methods; the hosted form owns the final available list.
+    # Return merchant-enabled methods; the shared Lunixi form owns the final available list.
     def methods(payment_method: nil)
       query = payment_method ? { paymentMethod: payment_method } : {}
       client.request('GET', "#{BASE}/methods", query: query)

@@ -21,7 +21,7 @@ bundle exec rails db:migrate db:seed
 bundle exec rails server -b 127.0.0.1
 ```
 
-Open `http://localhost:3000/orders/00000000-0000-4000-8000-000000000001`, log in with the configured demo credentials, and choose Pay. The seeded order is **100.50 TRY**. The form posts a CSRF token; the server ignores browser-provided prices. For Turkish UI append `?locale=tr`. The merchant's hosted-form settings determine which payment methods appear.
+Open `http://localhost:3000/orders/00000000-0000-4000-8000-000000000001`, log in with the configured demo credentials, and choose Pay. The seeded order is **100.50 TRY**. The form posts a CSRF token; the server ignores browser-provided prices. For Turkish UI append `?locale=tr`. The merchant's form settings determine which payment methods appear.
 
 Register `https://<your-public-host>/webhooks/lunixi` in the Lunixi dashboard, subscribe to the documented payment events, and configure the matching webhook secret. Route the tunnel/proxy to the same app. The return route only shows persisted order state; webhook delivery is a separate request.
 
@@ -30,7 +30,7 @@ A separate middleware also accepts only `POST /orders/{public_id}/return`: it bo
 ## State and security behavior
 
 - `Order.checkout_key` is persisted before gateway access and reused after uncertainty. `checkout_token` uses Active Record Encryption. `intent_id` and the order's public UUID bind callback correlation.
-- A fixed-origin URL builder validates fresh and stored checkout tokens before redirecting to `https://pay.lunixi.com/payment/<token>`. Logs at info level are disabled because Rails logs redirect locations. Never add raw request/response logging.
+The existing form opens on the merchant website by default. Optional hosted checkout uses the exact validated backend `paymentPageUrl`, independently of the embedded token. Encrypt the token and URL; both modes share the merchant-enabled form methods. Never collect PAN/CVV.
 - Buyer routes use HTTP Basic **demo** authentication and Rails CSRF. Replace demo authentication with your app's customer/tenant/order ownership checks before production. `WebhooksController < ActionController::API` uses raw bytes, no browser cookie session and no global CSRF exemption.
 - A unique `(connection_id, event_id)` receipt and the order update commit in one database transaction. Duplicate identical events return 200 without fulfillment twice; changed bytes under the same id return 400. Handler failures roll back both and return 503 for redelivery.
 - A `payment.captured` event is correlated to the persisted intent/order. An authenticated payment GET must confirm `CAPTURED`, exact integer amount, currency and order reference before the order becomes paid. Failure, preauthorization, unknown and inconsistent results remain pending. A browser return can never mark an order paid.
@@ -57,4 +57,18 @@ Kök dizinde `bundle install` çalıştırın; `.env.example` içindeki değişk
 
 Örnek sipariş adresinin sonuna `?locale=tr` ekleyin. Lunixi panelinde `/webhooks/lunixi` adresini kaydedin. Dönüş POST adaptörü en fazla 1 MiB ham gövdeyi atar; hiçbir alanı yorumlamadan, sipariş/oturum sorgusu veya mali yazım olmadan kimliği doğrulanmış GET adresine sabit 303 verir. Checkout CSRF koruması sürer. Kullanıcı dönüşü ödeme kanıtı değildir; imzalı webhook ve tutar/para birimi/sipariş/nihai durum sorgusu birlikte doğrulanır. Demo kimlik doğrulamasını üretimde gerçek kullanıcı ve sipariş yetkilendirmesiyle değiştirin. Testler para taşımaz; canlıya geçmeden yetkili TEST üye işyeri ile uçtan uca kabul testi yapılmalıdır.
 
-Set `LUNIXI_MERCHANT_ID` to the merchant UUID from your Lunixi account. The authenticated payment read must match this merchant, the saved payment ID, order, currency and complete settlement balances. Hosted checkout requests explicitly bind `metadata.allowedOrigin` to `https://pay.lunixi.com`.
+Only explicitly configured hosted reservations bind `metadata.allowedOrigin` to `https://pay.lunixi.com`; embedded checkout uses the merchant form origin. Existing reservations retain their original request.
+
+## On-site form and optional hosted checkout
+
+The Rails example defaults to `LUNIXI_CHECKOUT_MODE=embedded`. It renders the existing Lunixi form on the merchant page using the fixed official CDN, HTML-escaped JSON data attributes and a per-response CSP nonce. `Lunixi::Checkout.browser_config(token)` provides only the official object/mount configuration. No gateway HTML or merchant secrets are rendered.
+
+Set `LUNIXI_CHECKOUT_MODE=hosted` explicitly for optional redirect. `Lunixi::Checkout.payment_page_url(data.fetch('paymentPageUrl'))` and the Rails redirect wrapper validate the exact backend URL: HTTPS `pay.lunixi.com/payment/` followed by a 16–4096-character ASCII opaque value, with no userinfo, port, query, fragment or controls. It can differ from the embedded token. Do not construct a URL from that token. Both modes expose the same merchant-enabled form methods, multi-card, installments and insurance; these features do not require redirecting. The existing fixed-total single-intent settlement limitation still applies.
+
+Run `rails db:migrate` before deploying 0.1.2. New request/mode/callback and start time are persisted before network I/O; request/token/backend URL use Active Record Encryption. Retries reuse the saved body and key and stop financial dispatch after 23 hours. Existing rows are marked legacy hosted; unknown legacy requests or missing backend URLs remain reconciliation-only, without rewriting origin, resetting a key or inventing a URL. Global mode changes affect new reservations; existing requests retain their saved presentation. CSRF/demo authorization, raw webhooks, native receipt transactions and the bounded 3DS/split return adapter remain unchanged.
+
+Focused 0.1.2 verification: 24 Rails form/return/URL/CSP security tests with 225 assertions, 2 SDK helper tests with 5 assertions, RuboCop and Brakeman (one exact documented strict-URL redirect false positive). Prior full 0.1.1 results remain the baseline; live/merchant acceptance is deferred.
+
+The checkout page’s CSP permits form POSTs only to `'self'` and the configured gateway origin (default `https://api-gateway.lunixi.com`). This preserves wallet/provider and legacy POST handoffs supported by the browser SDK. For another reviewed provider, set server-only `LUNIXI_FORM_ACTION_ORIGINS` to a comma-separated list of exact HTTPS origins, without spaces, paths, trailing slashes, credentials, query, fragment or wildcards. Invalid configuration fails closed; gateway responses and browser fields never expand this list. Script nonces, frame/connect restrictions and informational return handling remain in force.
+
+Checkout sayfasının CSP’si form POST’u için yalnız `'self'` ve yapılandırılan gateway origin’ine (varsayılan `https://api-gateway.lunixi.com`) izin verir. Böylece tarayıcı SDK’sının desteklediği cüzdan/sağlayıcı ve eski POST geçişleri korunur. İncelenmiş başka bir sağlayıcı gerekiyorsa yalnız sunucuda `LUNIXI_FORM_ACTION_ORIGINS` tanımlayın: virgülle ayrılmış tam HTTPS origin’leri; boşluk, yol, sondaki slash, kullanıcı bilgisi, sorgu, fragment ve wildcard kabul edilmez. Geçersiz ayar reddedilir; gateway yanıtı veya tarayıcı alanı listeyi genişletemez. Script nonce, frame/connect sınırları ve bilgilendirici dönüş güvenliği korunur.
