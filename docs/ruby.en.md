@@ -13,7 +13,7 @@ description: Lunixi Ruby SDK — source installation, Ed25519 signing, payments,
 Ruby **3.3+**, Bundler and an OpenSSL build supporting **Ed25519** are required. The Rails example uses Rails 8.1.
 
 > 
-Version 0.1.0 is distributed from source. RubyGems publication is a separate release step; a registry install is not assumed here.
+Version 0.1.1 is distributed from source. RubyGems publication is a separate release step; a registry install is not assumed here.
 
 
 ```bash
@@ -21,7 +21,7 @@ git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.0.gem
+gem install ./lunixi-sdk-0.1.1.gem
 ```
 
 Source: [Lunixi-Payment/lunixi-ruby](https://github.com/Lunixi-Payment/lunixi-ruby). An application may also use a reviewed local checkout with `gem 'lunixi-sdk', path: '/absolute/path/to/lunixi-ruby'`. Pin an audited commit if you use a Bundler Git source.

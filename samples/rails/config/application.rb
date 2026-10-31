@@ -5,10 +5,12 @@ require 'rails'
 require 'active_record/railtie'
 require 'action_controller/railtie'
 require 'lunixi'
+require_relative '../lib/lunixi_return_adapter'
 
 module LunixiRailsSample
   class Application < Rails::Application
     config.load_defaults 8.1
+    config.middleware.insert_after ActionDispatch::HostAuthorization, LunixiReturnAdapter
     config.root = File.expand_path('..', __dir__)
     config.eager_load = false
     config.secret_key_base = ENV.fetch('SECRET_KEY_BASE')

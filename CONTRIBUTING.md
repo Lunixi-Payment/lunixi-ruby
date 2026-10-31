@@ -1,35 +1,9 @@
 # Contributing
 
-Thank you for helping improve Lunixi Ruby SDK.
+Use Ruby 3.3+ and Bundler. Run `bundle install`, then the validation commands in README.md. Node.js is needed for independent JSON.stringify compatibility tests. Use only synthetic credentials and local TLS fixtures in automated tests.
 
-## How this repository works
+Keep the SDK framework independent and the Rails layer thin. Preserve integer minor units, exact canonical bytes, persistent idempotency keys, raw-body webhook authentication, transactional deduplication and fail-closed reconciliation. Add a regression test for changed financial or security behavior. Do not add undocumented gateway endpoints or pretend an unimplemented service has typed coverage.
 
-This repository is published from Lunixi's internal source repository. Each
-release arrives here as a single `Release x.y.z` commit with a `vx.y.z` tag, so
-pull requests cannot be merged here directly.
+All buyer-facing sample strings belong in English and Turkish locale files. Keep README.md, README.tr.md, docs guides and the changelog consistent. Use the supplied Lunixi logo; the MIT code license does not grant separate trademark rights.
 
-- **Bugs and requests:** open an [issue](https://github.com/Lunixi-Payment/lunixi-ruby/issues/new/choose).
-  This is the fastest way to get a fix.
-- **Code suggestions:** you are welcome to open a pull request to show the
-  change. We apply it in the source repository, credit you in the changelog and
-  close the pull request when the release that contains it is published.
-
-## Running it locally
-
-```bash
-bundle install
-bundle exec rake test
-gem build lunixi-sdk.gemspec
-```
-
-## Before you open an issue
-
-- Check that you are on the latest release.
-- Include the Lunixi `requestId` from the error if you have one; it lets us
-  find the request on our side.
-- Never paste API keys, private keys, webhook secrets, tokens or customer data.
-  For security problems follow [SECURITY.md](SECURITY.md) instead.
-
-## Documentation
-
-Integration guides are at https://docs.lunixi.com/sdks/ruby.
+Before opening a pull request, run tests, RuboCop, bundler-audit, Brakeman and `gem build lunixi-sdk.gemspec`. Never commit `.env`, private key files, local databases, vendor bundles or audit output containing application data. Report vulnerabilities privately as described in SECURITY.md.

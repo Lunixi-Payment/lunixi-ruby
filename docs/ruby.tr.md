@@ -13,7 +13,7 @@ description: Lunixi Ruby SDK — kaynak kurulum, Ed25519 imza, ödeme ve fraud, 
 Ruby **3.3+**, Bundler ve **Ed25519** destekli OpenSSL gerekir. Rails örneği Rails 8.1 kullanır.
 
 > 
-0.1.0 kaynak kod üzerinden dağıtılır. RubyGems yayını ayrı bir sürüm adımıdır; aşağıdaki kurulum yayımlanmış bir registry paketi varsaymaz.
+0.1.1 kaynak kod üzerinden dağıtılır. RubyGems yayını ayrı bir sürüm adımıdır; aşağıdaki kurulum yayımlanmış bir registry paketi varsaymaz.
 
 
 ```bash
@@ -21,7 +21,7 @@ git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.0.gem
+gem install ./lunixi-sdk-0.1.1.gem
 ```
 
 Kaynak: [Lunixi-Payment/lunixi-ruby](https://github.com/Lunixi-Payment/lunixi-ruby). İncelenmiş yerel kopyayı `gem 'lunixi-sdk', path: '/tam/yol/lunixi-ruby'` ile kullanabilirsiniz. Bundler Git kaynağı kullanırken denetlenmiş commit’i sabitleyin.

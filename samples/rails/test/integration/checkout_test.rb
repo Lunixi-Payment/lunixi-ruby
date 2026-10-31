@@ -57,6 +57,35 @@ class CheckoutTest < RailsFlowTest
     assert_empty @payments.reads
   end
 
+  def test_cross_site_post_return_is_bounded_and_redirects_without_auth_or_side_effects
+    post return_order_path(@order.public_id), params: { status: 'CAPTURED', public_id: 'another-order', redirect: 'https://attacker.example' }
+    assert_response :see_other
+    assert_equal return_order_path(@order.public_id), response.headers['Location']
+    assert_equal 'pending', @order.reload.status
+    assert_empty @payments.intents
+    assert_empty @payments.reads
+    follow_redirect!
+    assert_response :unauthorized
+    get return_order_path(@order.public_id), headers: @auth
+    assert_response :see_other
+    assert_redirected_to order_path(@order.public_id)
+  end
+
+  def test_oversized_stateless_return_does_not_read_an_order_or_gateway
+    post return_order_path(@order.public_id), params: 'x' * 1_048_577, headers: { 'CONTENT_TYPE' => 'application/octet-stream' }
+    assert_response :content_too_large
+    assert_equal 'pending', @order.reload.status
+    assert_empty @payments.intents
+    assert_empty @payments.reads
+  end
+
+  def test_empty_stateless_post_return_also_resumes_through_owned_get
+    post return_order_path(@order.public_id)
+    assert_response :see_other
+    assert_equal return_order_path(@order.public_id), response.headers['Location']
+    assert_empty @payments.intents
+  end
+
   def test_stored_checkout_token_cannot_supply_a_redirect_host
     @order.update!(checkout_token: '//attacker.example/collect')
     checkout

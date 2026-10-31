@@ -68,7 +68,7 @@ Register this URL in the Lunixi dashboard and configure the matching webhook sec
 https://<your-public-host>/webhooks/lunixi
 ```
 
-Subscribe to the documented payment events. The external `WebhooksController < ActionController::API` uses exact `request.raw_post` bytes and no browser session. Only that separate endpoint accepts external requests; buyer routes retain CSRF and authentication.
+Subscribe to the documented payment events. The external `WebhooksController < ActionController::API` uses exact `request.raw_post` bytes and no browser session. A separate middleware also accepts only `POST /orders/{public_id}/return`: it bounds the discarded raw body to 1 MiB, ignores every field, performs no order/session lookup, gateway request or financial write, and returns an empty fixed same-origin 303 to the existing authenticated GET. This informational adapter does not use the webhook secret. Checkout retains Rails CSRF and authentication; the normal GET still requires demo authentication, to be replaced with your customer/order authorization before production.
 
 The SDK verifies v2 signature, timestamp, event id/type and rotation. `RailsReplayStore` then inserts a receipt with a unique `(connection_id, event_id)` constraint inside the **same database transaction** as order changes. An identical duplicate returns 200 without applying fulfillment twice. Different bytes under the same id return 400. Any handler/status-query failure rolls back the receipt and returns 503 so redelivery can recover.
 

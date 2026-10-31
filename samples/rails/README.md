@@ -25,6 +25,8 @@ Open `http://localhost:3000/orders/00000000-0000-4000-8000-000000000001`, log in
 
 Register `https://<your-public-host>/webhooks/lunixi` in the Lunixi dashboard, subscribe to the documented payment events, and configure the matching webhook secret. Route the tunnel/proxy to the same app. The return route only shows persisted order state; webhook delivery is a separate request.
 
+A separate middleware also accepts only `POST /orders/{public_id}/return`: it bounds the discarded raw body to 1 MiB, ignores every field, performs no order/session lookup, gateway request or financial write, and returns an empty fixed same-origin 303 to the existing authenticated GET. This informational adapter does not use the webhook secret. Checkout retains Rails CSRF and authentication; the normal GET still requires demo authentication, to be replaced with your customer/order authorization before production.
+
 ## State and security behavior
 
 - `Order.checkout_key` is persisted before gateway access and reused after uncertainty. `checkout_token` uses Active Record Encryption. `intent_id` and the order's public UUID bind callback correlation.
@@ -53,6 +55,6 @@ Tests use a real SQLite database and exercise authentication/CSRF, integer total
 
 Kök dizinde `bundle install` çalıştırın; `.env.example` içindeki değişkenleri shell veya secret manager üzerinden dışa aktarın. `.env` otomatik yüklenmez. Geçerli TEST anahtarı, private-key dosyası, webhook secret, HTTPS `PUBLIC_ORIGIN`, en az 16 bayt `DEMO_PASSWORD`, kalıcı `SECRET_KEY_BASE` ve üç bağımsız Rails şifreleme anahtarı gerekir. Ardından `samples/rails` altında `bundle exec rails db:migrate db:seed` ve `bundle exec rails server -b 127.0.0.1` çalıştırın.
 
-Örnek sipariş adresinin sonuna `?locale=tr` ekleyin. Lunixi panelinde `/webhooks/lunixi` adresini kaydedin. Kullanıcı dönüşü ödeme kanıtı değildir; imzalı webhook ve tutar/para birimi/sipariş/nihai durum sorgusu birlikte doğrulanır. Demo kimlik doğrulamasını üretimde gerçek kullanıcı ve sipariş yetkilendirmesiyle değiştirin. Testler para taşımaz; canlıya geçmeden yetkili TEST üye işyeri ile uçtan uca kabul testi yapılmalıdır.
+Örnek sipariş adresinin sonuna `?locale=tr` ekleyin. Lunixi panelinde `/webhooks/lunixi` adresini kaydedin. Dönüş POST adaptörü en fazla 1 MiB ham gövdeyi atar; hiçbir alanı yorumlamadan, sipariş/oturum sorgusu veya mali yazım olmadan kimliği doğrulanmış GET adresine sabit 303 verir. Checkout CSRF koruması sürer. Kullanıcı dönüşü ödeme kanıtı değildir; imzalı webhook ve tutar/para birimi/sipariş/nihai durum sorgusu birlikte doğrulanır. Demo kimlik doğrulamasını üretimde gerçek kullanıcı ve sipariş yetkilendirmesiyle değiştirin. Testler para taşımaz; canlıya geçmeden yetkili TEST üye işyeri ile uçtan uca kabul testi yapılmalıdır.
 
 Set `LUNIXI_MERCHANT_ID` to the merchant UUID from your Lunixi account. The authenticated payment read must match this merchant, the saved payment ID, order, currency and complete settlement balances. Hosted checkout requests explicitly bind `metadata.allowedOrigin` to `https://pay.lunixi.com`.

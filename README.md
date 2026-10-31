@@ -10,14 +10,14 @@ Server-side Ruby client for Lunixi payments, fraud and signed gateway requests. 
 
 Ruby **3.3+**, OpenSSL with **Ed25519** support, and Bundler. The runnable Rails sample uses **Rails 8.1** and SQLite. The core gem does not depend on Rails.
 
-Version **0.1.0** is distributed as source here. RubyGems publication is a separate release step; this guide does not assume a published registry package.
+Version **0.1.1** is distributed as source here. RubyGems publication is a separate release step; this guide does not assume a published registry package.
 
 ```bash
 git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.0.gem
+gem install ./lunixi-sdk-0.1.1.gem
 ```
 
 Inside this checkout, `bundle exec ruby …` loads the local gem. An application can use a reviewed checkout with `gem 'lunixi-sdk', path: '/absolute/path/to/lunixi-ruby'`. Pin an audited commit when using a Bundler Git source. Never use an unpinned moving branch for a production deployment.
@@ -101,7 +101,7 @@ lunixi.payments.refund('intent_123', amount: 2_500,
 links = lunixi.request('GET', '/api/v1/payments/links', query: { limit: 20 })
 ```
 
-Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 0.1.0 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
+Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 0.1.1 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
 
 ## Raw-body webhooks and durable deduplication
 
@@ -132,6 +132,8 @@ For deterministic tests, inject `transport:`, `clock:` and `sleeper:`. A transpo
 ## Rails and validation
 
 Follow [samples/rails/README.md](samples/rails/README.md) for the executable Rails integration, environment setup, migration and tests. It protects buyer routes with CSRF and demo authentication, encrypts checkout tokens, persists operation keys, and applies verified webhooks atomically. It is a reference integration, not a complete storefront or multitenant authorization system.
+
+The informational return POST is handled by a separate bounded middleware: it discards at most 1 MiB, ignores all form fields and performs no order/session lookup, gateway call or financial write. It returns an empty fixed same-origin 303 to the authenticated GET; checkout CSRF stays enabled.
 
 ```bash
 bundle exec rake test

@@ -68,7 +68,7 @@ Lunixi panelinde aşağıdaki URL’yi kaydedip eşleşen webhook secret’ını
 https://<public-hostunuz>/webhooks/lunixi
 ```
 
-Dokümante ödeme olaylarına abone olun. Dış çağrı alan `WebhooksController < ActionController::API`, özgün `request.raw_post` baytlarını kullanır ve tarayıcı session’ına bağlı değildir. Bu ayrı uç dış istek alır; alıcı rotalarında CSRF ve kimlik doğrulama korunur.
+Dokümante ödeme olaylarına abone olun. Dış çağrı alan `WebhooksController < ActionController::API`, özgün `request.raw_post` baytlarını kullanır ve tarayıcı session’ına bağlı değildir. Ayrı middleware yalnız `POST /orders/{public_id}/return` bilgi dönüşünü de kabul eder: atılan ham gövdeyi 1 MiB ile sınırlar, bütün alanları yok sayar; sipariş/oturum sorgusu, gateway çağrısı veya mali yazım yapmadan mevcut kimlik doğrulamalı GET adresine boş ve sabit aynı-origin 303 verir. Bu bilgi adaptörü webhook sırrını kullanmaz. Checkout CSRF ve kimlik doğrulamayı korur. Normal GET deneme kimliğini ister; yayında gerçek müşteri/sipariş yetkisine bağlanmalıdır.
 
 SDK v2 imza, zaman, olay kimliği/tipi ve rotasyonu doğrular. `RailsReplayStore`, benzersiz `(connection_id, event_id)` constraint’i olan receipt’i sipariş değişikliğiyle **aynı veritabanı transaction’ına** yazar. Aynı olay ikinci kez 200 döner ve sipariş yeniden işlenmez. Aynı kimliğin farklı baytları 400 alır. İşleyici veya sunucu ödeme sorgusu hatası receipt’i geri alır ve 503 döndürür; tekrar teslim kurtarabilir.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-10-31
+
+- Add a bounded stateless Rails POST return adapter before parameter/session processing. It ignores gateway browser fields and redirects to the existing authenticated GET; checkout CSRF remains required.
+- Add cross-site, empty-body, oversize and session-resume integration regressions. Browser returns never mark an order paid.
+
 ## 0.1.0 — 2026-10-31
 
 - Initial server-side Ruby SDK: OpenSSL Ed25519 signing, JavaScript-compatible compact JSON, concurrent token cache and bounded HTTPS transport.

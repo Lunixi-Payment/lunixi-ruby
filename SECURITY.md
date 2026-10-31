@@ -1,25 +1,20 @@
-# Security Policy
+# Security policy
 
-## Reporting a vulnerability
+Report suspected vulnerabilities privately to **developer@lunixi.com**. Include affected version, reproducible synthetic inputs, expected/actual behavior and impact. Do not send private keys, access/checkout tokens, PAN/CVV or customer information. Do not post exploitable details publicly before coordination.
 
-Please do not report security problems in public GitHub issues, pull requests
-or discussions.
+Security fixes target the latest released version. Review CHANGELOG.md and dependency advisories before deployment. Version 0.1.0 is the initial source release; it is not a claim of certification or a live merchant acceptance test.
 
-Email **developer@lunixi.com** with the subject line
-`Security: Lunixi Ruby SDK` and include:
+## Integration guarantees and responsibilities
 
-- the package version (`lunixi-sdk`) and your runtime version,
-- what an attacker could do and what is needed to do it,
-- steps or a minimal example that shows the problem.
+- OpenSSL provides Ed25519, HMAC-SHA256, TLS verification and constant-time comparison. No custom curve implementation exists.
+- SDK HTTP redirects are rejected; the gateway origin must use HTTPS. Ambient proxy configuration is not inherited. Use an injected transport for a reviewed enterprise proxy, retaining TLS/hostname verification and redirect restrictions.
+- Persist one idempotency key per financial operation before the first request; reuse it after uncertain outcomes. SDK retries never create a replacement key.
+- Webhooks must be verified over raw bytes. Commit event receipts and payment changes together, and roll back both on failure. Retain receipts according to the gateway's redelivery/reconciliation policy; never blindly prune them at the timestamp-tolerance boundary.
+- Reconcile order/intent identity, amount, currency and final status. Browser returns, pending/unknown split states, or successful token creation are insufficient for fulfillment.
+- Never log credentials, raw request/response/webhook bodies, card data or customer PII. SDK errors omit payloads. Application logging must preserve this boundary.
+- The Rails example disables request info logging because Rails includes redirect destinations in those logs. Checkout tokens are encrypted at rest. Demo HTTP Basic authentication is not a customer authorization system; integrate your own session/tenant/order authorization before deployment.
+- The fixed-origin hosted redirect produces one weak Brakeman warning. Its precise fingerprint, rationale and injection tests are recorded in samples/rails/config/brakeman.ignore. No security category is globally disabled.
 
-Leave real API keys, private keys, webhook secrets, tokens and customer data
-out of the report. If an example needs a key, use a test key you can revoke.
+## Required checks
 
-We reply to confirm we received the report and keep you informed while we
-work on it. Fixes are released as a new version of this package and listed in
-[CHANGELOG.md](CHANGELOG.md).
-
-## Supported versions
-
-Use the latest release. Security fixes are published as new versions; they are
-not applied to older releases.
+Run `bundle exec rake test`, `bundle exec rake rails:test`, `bundle exec rubocop`, `bundle exec bundle-audit check --update`, and `bundle exec brakeman --force --rails8 --path samples/rails --no-pager`. CI runs all checks with synthetic credentials. Live TEST-merchant acceptance and credentials provisioning are separate operational checks; automated tests move no money.
