@@ -1,0 +1,15 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Redirect",
+      "warning_code": 18,
+      "fingerprint": "5b80fb44444c60f3b126286e000e9bb0d2e2dee774386df00ccc2609cb18c304",
+      "check_name": "Redirect",
+      "message": "Possible unprotected redirect",
+      "file": "app/controllers/orders_controller.rb",
+      "line": 29,
+      "note": "Reviewed fixed-origin hosted checkout redirect. HostedCheckout.url validates both fresh and stored tokens against an anchored ASCII allowlist, then constructs URI::HTTPS with literal host pay.lunixi.com. No caller supplies scheme, host or delimiters. HostedCheckoutTest and CheckoutTest cover hostile stored tokens and redirect injection. Re-review this fingerprint on changes."
+    }
+  ],
+  "updated": "2026-10-31"
+}

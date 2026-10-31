@@ -1,0 +1,12 @@
+en:
+  checkout:
+    title: "Lunixi checkout example"
+    amount: "Order total"
+    pay: "Pay with Lunixi"
+    status: "Order status"
+    unavailable: "Payment is temporarily unavailable. Please try again later."
+    decimal: "."
+    states:
+      pending: "Pending payment"
+      paid: "Paid"
+      review: "Awaiting review"

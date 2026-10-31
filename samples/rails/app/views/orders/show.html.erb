@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="<%= I18n.locale %>">
+<head><meta charset="utf-8"><title><%= t('checkout.title') %></title><%= csrf_meta_tags %></head>
+<body>
+  <main>
+    <h1><%= t('checkout.title') %></h1>
+    <p><%= t('checkout.amount') %>: <%= @display_amount %></p>
+    <p><%= t('checkout.status') %>: <%= t("checkout.states.#{@order.status}") %></p>
+    <% unless @order.status == 'paid' %>
+      <%= form_with url: checkout_order_path(@order.public_id), method: :post do |form| %>
+        <%= form.submit t('checkout.pay') %>
+      <% end %>
+    <% end %>
+  </main>
+</body>
+</html>

@@ -1,0 +1,12 @@
+tr:
+  checkout:
+    title: "Lunixi ödeme örneği"
+    amount: "Sipariş toplamı"
+    pay: "Lunixi ile öde"
+    status: "Sipariş durumu"
+    unavailable: "Ödeme şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+    decimal: ","
+    states:
+      pending: "Ödeme bekleniyor"
+      paid: "Ödendi"
+      review: "İnceleme bekleniyor"

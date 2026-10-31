@@ -1,0 +1,14 @@
+/.bundle/
+/vendor/
+/pkg/
+/*.gem
+.env
+.env.*
+!.env.example
+/coverage/
+/tmp/
+/samples/rails/tmp/
+/samples/rails/log/
+/samples/rails/db/*.sqlite3*
+*.pem
+*.key

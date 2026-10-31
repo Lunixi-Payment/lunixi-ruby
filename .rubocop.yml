@@ -1,0 +1,36 @@
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - vendor/**/*
+    - tmp/**/*
+    - samples/rails/tmp/**/*
+    - samples/rails/db/schema.rb
+Layout/LineLength:
+  Max: 160
+Metrics/BlockLength:
+  Exclude:
+    - test/**/*
+    - samples/rails/test/**/*
+    - Rakefile
+    - '*.gemspec'
+Metrics/MethodLength:
+  Max: 40
+Metrics/AbcSize:
+  Max: 45
+  Exclude:
+    - test/**/*
+    - samples/rails/test/**/*
+Metrics/ClassLength:
+  Max: 210
+Metrics/ParameterLists:
+  Max: 9
+Metrics/CyclomaticComplexity:
+  Max: 15
+Metrics/PerceivedComplexity:
+  Max: 15
+Style/Documentation:
+  Enabled: false
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
