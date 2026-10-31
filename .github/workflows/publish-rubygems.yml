@@ -7,7 +7,7 @@ on:
       version:
         description: Existing tested release version, without v
         required: true
-        default: '0.1.1'
+        default: '0.1.2'
         type: string
 
 permissions:
@@ -35,9 +35,10 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$VERSION" == "0.1.2" ]]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: v${{ inputs.version }}
+          ref: 579cdf8afeaad0cdba2764c312005bc60480227b # reviewed immutable v0.1.2 source
           persist-credentials: false
       - name: Refuse an existing registry version
         shell: bash
