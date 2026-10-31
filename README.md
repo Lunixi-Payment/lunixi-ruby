@@ -10,10 +10,17 @@ Server-side Ruby client for Lunixi payments, fraud and signed gateway requests. 
 
 Ruby **3.3+**, OpenSSL with **Ed25519** support, and Bundler. The runnable Rails sample uses **Rails 8.1** and SQLite. The core gem does not depend on Rails.
 
-Version **0.1.2** is distributed as source here. RubyGems publication is a separate release step; this guide does not assume a published registry package.
+Version **0.1.2** is [published on RubyGems](https://rubygems.org/gems/lunixi-sdk/versions/0.1.2). Add the exact version to your application's `Gemfile`, then run `bundle install`:
+
+```ruby
+source 'https://rubygems.org'
+gem 'lunixi-sdk', '0.1.2'
+```
+
+Keep `Gemfile.lock` to retain the reviewed dependency resolution. To build the reviewed source instead:
 
 ```bash
-git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
+git clone --branch v0.1.2 --depth 1 https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
@@ -67,7 +74,6 @@ result = lunixi.payments.create_intent(
 intent_id = result.fetch('data').fetch('paymentId')
 checkout_token = result.fetch('data').fetch('token')
 # Persist the intent id and encrypt the checkout token at rest.
-# The Rails sample validates the token and builds a fixed-origin redirect:
 # Optional hosted checkout uses the validated backend paymentPageUrl, never a URL built from this token.
 ```
 

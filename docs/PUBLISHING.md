@@ -20,7 +20,15 @@ The contract was checked against the [RubyGems controller at commit `5a641a1e1ac
 
 The account owner must review and authorize this package-specific publishing delegation. The workflow alone does not create the publisher or publish a gem. After authorization, run it from `main` with version `0.1.2`; it refuses a version that already exists. Verify the resulting version and downloaded gem digest from RubyGems.
 
-The build does not repeat the functional suite. Ephemeral runner credentials are removed after the upload. Registry publication remains account/publisher-gated: the public source tag, successful CI and prepared workflow do not mean that `lunixi-sdk` 0.1.2 is already available on RubyGems.
+The build does not repeat the functional suite. Ephemeral runner credentials are removed after the upload.
+
+## Verified 0.1.2 publication
+
+The account owner authorized the exact publisher above. [Publish run 41249047391](https://github.com/Lunixi-Payment/lunixi-ruby/actions/runs/41249047391) completed successfully from workflow commit `7a4a0e7b6f647490f7f09b650847c38f0b7d3b19`, while the package checkout remained pinned to `579cdf8afeaad0cdba2764c312005bc60480227b`. The original `v0.1.2` tag is unchanged.
+
+[RubyGems 0.1.2](https://rubygems.org/gems/lunixi-sdk/versions/0.1.2) is available with SHA-256 `c9c6386c03a3b853d56335c2f21e91f18d3450a83906d5ad15d9fc07ac1ce16f`. A retry of this one-release workflow refuses the already published version. Future releases require a separately reviewed source/version update.
+
+The downloaded 39,424-byte archive matches the registry checksum. All 23 packaged files match both the prepared gem and the immutable release source; build metadata can differ between independently built archives.
 
 - [Trusted Publishing and pending publishers](https://guides.rubygems.org/trusted-publishing/)
 - [RubyGems publishing](https://guides.rubygems.org/publishing/)
