@@ -5,7 +5,7 @@ class Order < ApplicationRecord
   encrypts :checkout_token, :payment_page_url, :checkout_request
   before_validation :assign_identifiers, on: :create
   validates :public_id, :checkout_key, presence: true, uniqueness: true
-  validates :amount_minor, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: Lunixi::JsonBody::MAX_SAFE_INTEGER }
+  validates :amount_minor, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: Lunixi::Money::MAX }
   validates :currency, inclusion: { in: ['TRY'] }
   validates :status, inclusion: { in: %w[pending paid review] }
 

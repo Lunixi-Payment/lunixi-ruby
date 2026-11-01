@@ -1,13 +1,13 @@
-# Manual publication requires the matching account-owned RubyGems publisher.
+# Manual publication requires the matching release tag and account-owned RubyGems publisher.
 name: Publish rubygems
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing tested release version, without v
+        description: Existing tested version without v; select its matching vVERSION tag above
         required: true
-        default: '0.1.2'
+        default: '1.0.0'
         type: string
 
 permissions:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.repository == 'Lunixi-Payment/lunixi-ruby' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Lunixi-Payment/lunixi-ruby'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: release
@@ -30,15 +30,50 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
     steps:
-      - name: Validate version input
+      - name: Resolve exact public tag and require successful CI on that commit
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          [[ "$VERSION" == "0.1.2" ]]
+          python3 - <<'PY'
+          import json, os, re, urllib.parse, urllib.request
+          version = os.environ['VERSION']
+          assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version), 'Invalid numeric version'
+          repo, tag = 'Lunixi-Payment/lunixi-ruby', 'v' + version
+          assert os.environ['GITHUB_REPOSITORY'] == repo
+          assert os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          assert os.environ['GITHUB_REF'] == 'refs/tags/' + tag, 'Dispatch from the matching release tag, not main'
+          def api(path):
+              request = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  body = response.read(4 * 1024 * 1024 + 1)
+              assert len(body) <= 4 * 1024 * 1024, 'Public source metadata exceeds the release gate limit'
+              return json.loads(body)
+          obj = api('git/ref/tags/' + tag)['object']
+          for _ in range(4):
+              assert re.fullmatch(r'[0-9a-f]{40}', obj['sha'])
+              if obj['type'] == 'commit':
+                  break
+              assert obj['type'] == 'tag', 'Tag does not identify a commit'
+              obj = api('git/tags/' + obj['sha'])['object']
+          sha = obj['sha']
+          assert obj['type'] == 'commit' and re.fullmatch(r'[0-9a-f]{40}', sha)
+          assert sha == os.environ['GITHUB_SHA'], 'Tag moved or invocation source differs'
+          runs = api('actions/workflows/ci.yml/runs?' + urllib.parse.urlencode({'head_sha': sha, 'event': 'push', 'per_page': 20}))
+          assert any(run.get('head_sha') == sha and run.get('event') == 'push'
+                     and run.get('status') == 'completed' and run.get('conclusion') == 'success'
+                     and (run.get('head_repository') or {}).get('full_name') == repo
+                     for run in runs['workflow_runs']), 'Successful push CI required for the exact release commit'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('source_sha=' + sha + '\n')
+          print('Exact release invocation, immutable public source and successful CI verified.')
+          PY
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 579cdf8afeaad0cdba2764c312005bc60480227b # reviewed immutable v0.1.2 source
+          ref: ${{ steps.source.outputs.source_sha }}
           persist-credentials: false
       - name: Refuse an existing registry version
         shell: bash
@@ -52,30 +87,34 @@ jobs:
             200) echo 'This registry version already exists; refusing replacement.' >&2; exit 1 ;;
             *) echo "Registry preflight failed with HTTP $status" >&2; exit 1 ;;
           esac
-      - name: Require successful CI for the exact release source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_sha="$(git rev-parse HEAD)"
-          result="$(gh api --method GET \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$source_sha&event=push&per_page=1" \
-            --jq '.workflow_runs[0] | select(.status == "completed" and .conclusion == "success") | .head_sha')"
-          [[ "$result" == "$source_sha" ]]
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: '3.4'
       - name: Build and validate the gem before requesting a token
+        id: package
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           ruby -rrubygems -e 's = Gem::Specification.load("lunixi-sdk.gemspec"); abort "Wrong gem identity" unless s.name == "lunixi-sdk" && s.version.to_s == ENV.fetch("VERSION")'
           mkdir -p package
           gem build lunixi-sdk.gemspec --output "package/lunixi-sdk-${VERSION}.gem"
           ruby -rrubygems/package -e 's = Gem::Package.new("package/lunixi-sdk-#{ENV.fetch("VERSION")}.gem").spec; abort "Wrong packaged identity" unless s.name == "lunixi-sdk" && s.version.to_s == ENV.fetch("VERSION")'
           git diff --exit-code
-          sha256sum "package/lunixi-sdk-${VERSION}.gem"
+          python3 - <<'PY'
+          import hashlib, os, pathlib
+          directory = pathlib.Path('package')
+          filename = 'lunixi-sdk-' + os.environ['VERSION'] + '.gem'
+          assert sorted(path.name for path in directory.iterdir()) == [filename]
+          package = directory / filename
+          assert package.is_file() and not package.is_symlink()
+          digest = hashlib.sha256(package.read_bytes()).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('sha256=' + digest + '\n')
+          print('Validated gem SHA-256: ' + digest)
+          PY
       - name: Authenticate for the approved immutable RubyGems owner
         shell: bash
         run: |
@@ -161,7 +200,27 @@ jobs:
               sys.exit("RubyGems OIDC authentication failed. No response body or exception details were logged.")
           PY
       - name: Publish the verified gem
-        run: gem push --host https://rubygems.org "package/lunixi-sdk-${VERSION}.gem"
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          EXPECTED_SHA256: ${{ steps.package.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, os, pathlib, re
+          version, source = os.environ['VERSION'], os.environ['SOURCE_SHA']
+          assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version)
+          assert re.fullmatch(r'[0-9a-f]{40}', source) and source == os.environ['GITHUB_SHA']
+          assert os.environ['GITHUB_REPOSITORY'] == 'Lunixi-Payment/lunixi-ruby'
+          assert os.environ['GITHUB_REF'] == 'refs/tags/v' + version
+          directory = pathlib.Path('package')
+          filename = 'lunixi-sdk-' + version + '.gem'
+          assert sorted(path.name for path in directory.iterdir()) == [filename]
+          package = directory / filename
+          assert package.is_file() and not package.is_symlink()
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == os.environ['EXPECTED_SHA256'], 'Gem changed after validation'
+          PY
+          gem push --host https://rubygems.org "package/lunixi-sdk-${VERSION}.gem"
       - name: Remove ephemeral runner credentials
         if: always()
         shell: bash

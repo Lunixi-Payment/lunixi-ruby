@@ -35,7 +35,7 @@ class CheckoutFlow
       raise Lunixi::Error, 'Legacy checkout requires reconciliation' if @order.checkout_legacy || @order.intent_id.present?
 
       metadata = requested_mode == 'hosted' ? { allowedOrigin: 'https://pay.lunixi.com' } : {}
-      payload = { amount: @order.amount_minor, currency: @order.currency, orderId: @order.public_id,
+      payload = { amount: @order.amount_minor.to_s, currency: @order.currency, orderId: @order.public_id,
                   callbackUrl: callback, metadata: metadata }
       @order.update!(checkout_mode: requested_mode, checkout_request: JSON.generate(payload), checkout_started_at: Time.current)
     end
@@ -43,7 +43,7 @@ class CheckoutFlow
 
   def reserved_payload
     payload = JSON.parse(@order.checkout_request)
-    unless payload.values_at('amount', 'currency', 'orderId') == [@order.amount_minor, @order.currency, @order.public_id]
+    unless payload.values_at('amount', 'currency', 'orderId') == [@order.amount_minor.to_s, @order.currency, @order.public_id]
       raise Lunixi::Error, 'Persisted order changed; reconcile checkout'
     end
 

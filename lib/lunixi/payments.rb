@@ -5,6 +5,8 @@ module Lunixi
   # documented endpoints without pretending to validate their entire DTO schema.
   class Payments
     BASE = '/api/v1/payments'
+    OMITTED_AMOUNT = Object.new.freeze
+    private_constant :OMITTED_AMOUNT
     attr_reader :client
 
     def initialize(client)
@@ -36,17 +38,17 @@ module Lunixi
       client.request('GET', "#{BASE}/methods", query: query)
     end
 
-    # Capture an authorization; nil amount requests the gateway's remaining amount.
-    def capture(payment_id, idempotency_key:, amount: nil)
+    # Omit amount to capture the remaining authorization; explicit nil is invalid.
+    def capture(payment_id, idempotency_key:, amount: OMITTED_AMOUNT)
       body = { 'paymentIntentId' => identifier!(payment_id) }
-      body['amount'] = minor!(amount) unless amount.nil?
+      body['amount'] = minor!(amount) unless amount.equal?(OMITTED_AMOUNT)
       client.request('POST', "#{BASE}/#{payment_id}/capture", body: body, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 
     # Refund captured funds; persist a separate key for each refund operation.
-    def refund(payment_id, idempotency_key:, amount: nil, reason: nil)
+    def refund(payment_id, idempotency_key:, amount: OMITTED_AMOUNT, reason: nil)
       body = { 'paymentIntentId' => identifier!(payment_id) }
-      body['amount'] = minor!(amount) unless amount.nil?
+      body['amount'] = minor!(amount) unless amount.equal?(OMITTED_AMOUNT)
       body['reason'] = reason!(reason) unless reason.nil?
       client.request('POST', "#{BASE}/#{payment_id}/refund", body: body, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
@@ -68,9 +70,9 @@ module Lunixi
       total = legs.sum do |leg|
         raise ConfigurationError, 'Split legs must be objects' unless leg.is_a?(Hash)
 
-        minor!(leg['amount'])
+        minor!(leg['amount']).to_i
       end
-      raise ConfigurationError, 'Split leg amounts must equal totalAmount' unless total == data['totalAmount']
+      raise ConfigurationError, 'Split leg amounts must equal totalAmount' unless total == data['totalAmount'].to_i
 
       client.request('POST', "#{BASE}/split", body: data, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
@@ -97,11 +99,7 @@ module Lunixi
     end
 
     def minor!(value)
-      unless value.is_a?(Integer) && value.positive? && value <= JsonBody::MAX_SAFE_INTEGER
-        raise ConfigurationError, 'Amount must be a positive safe integer in minor units'
-      end
-
-      value
+      Money.minor(value)
     end
 
     def currency!(value)
@@ -155,9 +153,9 @@ module Lunixi
       total = items.sum do |item|
         raise ConfigurationError, 'Basket items must be objects' unless item.is_a?(Hash)
 
-        minor!(item['price'])
+        minor!(item['price']).to_i
       end
-      raise ConfigurationError, 'Basket total must equal amount' unless total == amount
+      raise ConfigurationError, 'Basket total must equal amount' unless total == amount.to_i
     end
   end
 end

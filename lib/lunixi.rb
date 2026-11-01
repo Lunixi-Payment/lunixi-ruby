@@ -3,6 +3,7 @@
 require_relative 'lunixi/version'
 require_relative 'lunixi/errors'
 require_relative 'lunixi/json_body'
+require_relative 'lunixi/money'
 require_relative 'lunixi/signer'
 require_relative 'lunixi/transport'
 require_relative 'lunixi/payments'

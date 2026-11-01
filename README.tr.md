@@ -56,16 +56,16 @@ Toplamı sunucuda hesaplayın. Çağrıdan **önce** ödeme denemesine bir UUID 
 
 ```ruby
 result = lunixi.payments.create_intent(
-  { amount: 10_050, currency: 'TRY', orderId: order.public_id,
+  { amount: "10050", currency: 'TRY', orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'urun-1', name: 'Product', itemType: 'PHYSICAL', price: 10_050 }] },
+    basketItems: [{ id: 'urun-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }] },
   idempotency_key: order.persisted_payment_attempt_key
 )
 intent_id = result.fetch('data').fetch('paymentId')
 checkout_token = result.fetch('data').fetch('token')
 ```
 
-`10_050`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif ve JavaScript güvenli tam sayı aralığında olmalıdır; float/string kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
+`"10050"`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır; sayısal değerler kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
 
 Varsayılan form mağaza içinde açılır; isteğe bağlı yönlendirme yalnız doğrulanmış backend `paymentPageUrl` adresini kullanır. Token ve adres şifrelenir; iki mod aynı Lunixi form ayarlarını paylaşır. PAN/CVV toplamayın.
 
@@ -78,15 +78,15 @@ HTTP 2xx, token, dönüş sayfası veya devam eden split durumu tahsilat kanıt�
 | Intent oluşturma | `payments.create_intent(body, idempotency_key:)` |
 | Ödeme okuma/listeleme | `payments.get(id)`, `payments.list(**filters)` |
 | Açık yöntemler | `payments.methods(payment_method: nil)` |
-| Capture | `payments.capture(id, idempotency_key:, amount: nil)` |
-| Tam/kısmi iade | `payments.refund(id, idempotency_key:, amount: nil, reason: nil)` |
+| Capture | `payments.capture(id, idempotency_key:)` |
+| Tam/kısmi iade | `payments.refund(id, idempotency_key:, reason: nil)` |
 | Provizyon iptali | `payments.void(id, idempotency_key:)` |
 | Çoklu ödeme | `payments.split(body, idempotency_key:)` |
 | Split durum/iade | `payments.get_split(id)`, `payments.refund_split(id, amount:, idempotency_key:, reason: nil)` |
 | Fraud | `fraud.evaluate(body)`, `fraud.record_event(body, idempotency_key:)` |
 | Diğer dokümante uçlar | `request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false)` |
 
-Capture/iade için `amount: nil`, gateway’in kalan tutarı kullanmasını ister. `0`, `false`, float ve string tutar reddedilir. Her capture/iade/iptal için ayrı ve kalıcı işlem anahtarı gerekir. Yanıt zarfı korunur. Payment, fraud ve webhook yardımcıları açıktır; diğer servisler dokümante şema ile imzalı transport üzerinden çağrılır. Bu sürüm PHP SDK’sındaki tüm servisler için ayrı tipli istemci sunduğunu iddia etmez.
+Capture/iade için `amount:` anahtarını göndermemek, gateway’in kalan tutarı kullanmasını ister; açık `amount: nil` reddedilir. `"0"`, `false`, sayısal değerler ve kanonik olmayan string tutar reddedilir. Her capture/iade/iptal için ayrı ve kalıcı işlem anahtarı gerekir. Yanıt zarfı korunur. Payment, fraud ve webhook yardımcıları açıktır; diğer servisler dokümante şema ile imzalı transport üzerinden çağrılır. Bu sürüm PHP SDK’sındaki tüm servisler için ayrı tipli istemci sunduğunu iddia etmez.
 
 ## Webhook güvenliği
 

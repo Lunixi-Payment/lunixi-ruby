@@ -35,7 +35,7 @@ class PaymentWebhookTest < RailsFlowTest
   end
 
   def test_rolls_back_receipt_and_payment_on_wrong_amount
-    @payments.payment = captured_payment(amount: 1)
+    @payments.payment = captured_payment(amount: "1")
     event = signed_event
     deliver(event)
     assert_response :service_unavailable

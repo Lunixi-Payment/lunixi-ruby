@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.homepage = 'https://github.com/Lunixi-Payment/lunixi-ruby'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.3'
-  spec.files = Dir['lib/**/*.rb', 'docs/**/*.md', '.github/assets/*', 'README.md', 'README.tr.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md']
+  spec.files = Dir['lib/**/*.rb', 'docs/**/*.md', '.github/assets/*', 'README.md', 'README.tr.md', 'MIGRATION-1.0.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md']
   spec.require_paths = ['lib']
   spec.metadata = {
     'source_code_uri' => spec.homepage,

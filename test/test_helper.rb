@@ -17,8 +17,8 @@ module TestSupport
   end
 
   def payment_body
-    { amount: 10_050, currency: 'TRY', orderId: 'order_123', callbackUrl: 'https://merchant.example/payment/return',
-      basketItems: [{ id: 'item_1', name: 'Test item', itemType: 'PHYSICAL', price: 10_050 }] }
+    { amount: "10050", currency: 'TRY', orderId: 'order_123', callbackUrl: 'https://merchant.example/payment/return',
+      basketItems: [{ id: 'item_1', name: 'Test item', itemType: 'PHYSICAL', price: "10050" }] }
   end
 
   def idempotency_key

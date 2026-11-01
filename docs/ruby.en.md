@@ -59,11 +59,11 @@ Persist the payment attempt and its UUID idempotency key before the first reques
 ```ruby
 result = lunixi.payments.create_intent(
   {
-    amount: 10_050,
+    amount: "10050",
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: 10_050 }]
+    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }]
   },
   idempotency_key: order.persisted_payment_attempt_key
 )
@@ -78,7 +78,7 @@ checkout_token = result.fetch('data').fetch('token')
 An intent/token, HTTP 2xx, return URL or intermediate split state does not prove capture. Correlate a verified webhook with the persisted order and authenticate a payment status read; confirm final status, amount and currency before fulfillment.
 
 
-Amounts must be positive integers within JavaScript's safe integer range. Root `price` and `paidPrice` are rejected even when null. Basket prices and split leg amounts must equal the relevant total. Intent `installment` is rejected because installments are selected in the checkout form. `preauth: true` requests authorization; capture is a separate operation.
+Amounts must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price` and `paidPrice` are rejected even when null. Basket prices and split leg amounts must equal the relevant total. Intent `installment` is rejected because installments are selected in the checkout form. `preauth: true` requests authorization; capture is a separate operation.
 
 ## Available helpers
 
@@ -87,15 +87,15 @@ Amounts must be positive integers within JavaScript's safe integer range. Root `
 | Create an intent | `lunixi.payments.create_intent(body, idempotency_key:)` |
 | Read/list payments | `lunixi.payments.get(id)`, `lunixi.payments.list(**filters)` |
 | Merchant methods | `lunixi.payments.methods(payment_method: nil)` |
-| Capture | `lunixi.payments.capture(id, idempotency_key:, amount: nil)` |
-| Full/partial refund | `lunixi.payments.refund(id, idempotency_key:, amount: nil, reason: nil)` |
+| Capture | `lunixi.payments.capture(id, idempotency_key:)` |
+| Full/partial refund | `lunixi.payments.refund(id, idempotency_key:, reason: nil)` |
 | Void | `lunixi.payments.void(id, idempotency_key:)` |
 | Split payment | `lunixi.payments.split(body, idempotency_key:)` |
 | Split status/refund | `lunixi.payments.get_split(id)`, `lunixi.payments.refund_split(id, amount:, idempotency_key:, reason: nil)` |
 | Fraud | `lunixi.fraud.evaluate(body)`, `lunixi.fraud.record_event(body, idempotency_key:)` |
 | Advanced signed HTTP | `lunixi.request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false)` |
 
-Capture/refund `amount: nil` asks the gateway to use the remaining amount. False, zero, string and fractional amounts are rejected. Persist a separate operation key for each capture, refund or void. Running split HTTP 400 protocol responses are returned only for documented running states; they remain pending, not paid. Response envelopes are preserved.
+Omit the capture/refund `amount:` keyword to use the remaining amount. Explicit nil, false, zero, numeric and noncanonical string amounts are rejected. Persist a separate operation key for each capture, refund or void. Running split HTTP 400 protocol responses are returned only for documented running states; they remain pending, not paid. Response envelopes are preserved.
 
 The advanced transport supports other **documented** gateway routes without a second HTTP implementation:
 

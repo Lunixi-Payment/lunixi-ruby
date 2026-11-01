@@ -30,7 +30,7 @@ class ClientTest < Minitest::Test
       count < 3 ? response(503, { code: 'temporarily_unavailable' }, { 'retry-after' => '2' }) : response
     end
     sdk = client(transport: transport, sleeper: ->(seconds) { delays << seconds })
-    sdk.payments.refund('pay_1', amount: 50, idempotency_key: idempotency_key)
+    sdk.payments.refund('pay_1', amount: "50", idempotency_key: idempotency_key)
     requests = transport.calls.drop(1)
     assert_equal [2, 2], delays
     assert_equal [idempotency_key], requests.map { |request| request[:headers]['Idempotency-Key'] }.uniq
@@ -116,7 +116,7 @@ class ClientTest < Minitest::Test
     payload = { code: 'AWAITING_ACTION', data: { splitPaymentId: 'split_1', status: 'AWAITING_ACTION' } }
     transport = RecordingTransport.new { response(400, payload) }
     sdk = client(transport: transport)
-    split = sdk.payments.split({ totalAmount: 100, currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: 100, cardToken: 'stored_token' }] },
+    split = sdk.payments.split({ totalAmount: "100", currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: "100", cardToken: 'stored_token' }] },
                                idempotency_key: idempotency_key)
     assert_equal 'AWAITING_ACTION', split.dig('data', 'status')
     assert_raises(Lunixi::ValidationError) { sdk.payments.get('pay_1') }

@@ -42,16 +42,15 @@ class WebhookProcessor
     valid = payment.is_a?(Hash) && payment['status'] == 'CAPTURED' &&
             payment['id'] == order.intent_id && payment['merchantId'] == Rails.configuration.x.lunixi_merchant_id &&
             payment['orderId'] == order.public_id && payment['currency'] == order.currency &&
-            payment['amount'].is_a?(Integer) && payment['amount'] == order.amount_minor &&
+            minor(payment['amount']) == order.amount_minor &&
             !payment['split'] && minor(envelope.dig('details', 'capturedAmount')) == order.amount_minor &&
             minor(envelope.dig('details', 'refundedAmount')).zero?
     raise InconsistentPayment, 'Payment requires reconciliation' unless valid
   end
 
   def minor(value)
-    return value if value.is_a?(Integer) && value.between?(0, Lunixi::JsonBody::MAX_SAFE_INTEGER)
-    return value.to_i if value.is_a?(String) && value.match?(/\A[0-9]{1,16}\z/) && value.to_i <= Lunixi::JsonBody::MAX_SAFE_INTEGER
-
+    Lunixi::Money.minor(value, positive: false).to_i
+  rescue Lunixi::ConfigurationError
     raise InconsistentPayment, 'Authenticated settlement amount is missing or invalid'
   end
 end

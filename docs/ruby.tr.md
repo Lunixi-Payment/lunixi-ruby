@@ -59,11 +59,11 @@ Public anahtarı Lunixi paneline kaydedip verilen key id’yi kullanın. Özel a
 ```ruby
 result = lunixi.payments.create_intent(
   {
-    amount: 10_050,
+    amount: "10050",
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: 10_050 }]
+    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }]
   },
   idempotency_key: order.persisted_payment_attempt_key
 )
@@ -78,7 +78,7 @@ checkout_token = result.fetch('data').fetch('token')
 Intent/token, HTTP 2xx, dönüş sayfası veya ara split durumu tahsilat kanıtı değildir. İmzalı webhook’u kalıcı siparişle eşleştirin; sunucudan ödeme sorgusunda nihai durum, tutar ve para birimi uyuşmadan siparişi tamamlamayın.
 
 
-Tutarlar pozitif ve JavaScript güvenli tam sayı aralığında olmalıdır. Kök `price`/`paidPrice` null olsa bile reddedilir. Sepet ve split bacak toplamları ana toplamla aynı olmalıdır. Intent’te `installment` gönderilmez; taksit formda seçilir. `preauth: true` provizyon ister; capture ayrı işlemdir.
+Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır. Kök `price`/`paidPrice` null olsa bile reddedilir. Sepet ve split bacak toplamları ana toplamla aynı olmalıdır. Intent’te `installment` gönderilmez; taksit formda seçilir. `preauth: true` provizyon ister; capture ayrı işlemdir.
 
 ## Yardımcı API’ler
 
@@ -87,15 +87,15 @@ Tutarlar pozitif ve JavaScript güvenli tam sayı aralığında olmalıdır. Kö
 | Intent | `lunixi.payments.create_intent(body, idempotency_key:)` |
 | Ödeme okuma/liste | `lunixi.payments.get(id)`, `lunixi.payments.list(**filters)` |
 | Açık yöntemler | `lunixi.payments.methods(payment_method: nil)` |
-| Capture | `lunixi.payments.capture(id, idempotency_key:, amount: nil)` |
-| Tam/kısmi iade | `lunixi.payments.refund(id, idempotency_key:, amount: nil, reason: nil)` |
+| Capture | `lunixi.payments.capture(id, idempotency_key:)` |
+| Tam/kısmi iade | `lunixi.payments.refund(id, idempotency_key:, reason: nil)` |
 | Provizyon iptali | `lunixi.payments.void(id, idempotency_key:)` |
 | Split | `lunixi.payments.split(body, idempotency_key:)` |
 | Split durum/iade | `lunixi.payments.get_split(id)`, `lunixi.payments.refund_split(id, amount:, idempotency_key:, reason: nil)` |
 | Fraud | `lunixi.fraud.evaluate(body)`, `lunixi.fraud.record_event(body, idempotency_key:)` |
 | İmzalı genel HTTP | `lunixi.request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false)` |
 
-Capture/iade `amount: nil`, kalan tutarın gateway tarafından kullanılmasını ister. False, sıfır, string ve kesirli tutar reddedilir. Her capture/iade/iptal için ayrı, kalıcı anahtar saklayın. Belgelenmiş devam eden split durumlarındaki HTTP 400 yanıtları protokol sonucu olarak döndürülür; ödenmiş sayılmaz. Yanıt zarfı korunur.
+Capture/iade `amount:` anahtarı gönderilmezse kalan tutar kullanılır; açık `amount: nil` reddedilir. False, sıfır, sayısal değerler ve kanonik olmayan string tutar reddedilir. Her capture/iade/iptal için ayrı, kalıcı anahtar saklayın. Belgelenmiş devam eden split durumlarındaki HTTP 400 yanıtları protokol sonucu olarak döndürülür; ödenmiş sayılmaz. Yanıt zarfı korunur.
 
 Diğer **dokümante** gateway uçları aynı imzalı transport üzerinden çağrılabilir:
 

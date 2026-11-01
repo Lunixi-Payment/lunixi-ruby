@@ -39,6 +39,11 @@ module Lunixi
 
       path = safe_path(path, query)
       key = self.class.idempotency_key!(idempotency_key) if idempotency_key
+      Money.validate_operation_amount(path, body)
+      if Money.fiat_route?(path)
+        Money.validate_fields(body)
+        Money.validate_fields(query)
+      end
       bytes = body.nil? ? nil : JsonBody.dump(body)
       raise ConfigurationError, 'Request body exceeds the size limit' if bytes && bytes.bytesize > 1024 * 1024
 
@@ -77,7 +82,7 @@ module Lunixi
           retries += 1
           next
         end
-        return decode_response(response, binary: binary, running_split: method == 'POST' && path == '/api/v1/payments/split')
+        return decode_response(response, binary: binary, fiat: Money.fiat_route?(path), running_split: method == 'POST' && path == '/api/v1/payments/split')
       rescue TransportError
         raise unless safe_to_retry && retries < @max_retries
 
@@ -187,7 +192,7 @@ module Lunixi
       @sleeper.call(seconds)
     end
 
-    def decode_response(response, binary: false, running_split: false)
+    def decode_response(response, binary: false, running_split: false, fiat: false)
       return response.body.b.freeze if binary && response.status.between?(200, 299)
 
       begin
@@ -196,6 +201,7 @@ module Lunixi
         raise ApiError.new(status: response.status, code: 'invalid_json_response'), cause: nil
       end
       raise ApiError.new(status: response.status, code: 'invalid_json_response') unless payload.is_a?(Hash)
+      Money.validate_fields(payload, response: true) if fiat
       return payload if response.status.between?(200, 299)
 
       error_class = case response.status
