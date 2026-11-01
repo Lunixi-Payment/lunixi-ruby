@@ -20,9 +20,9 @@ class PaymentsTest < Minitest::Test
   end
 
   def test_rejects_mismatched_basket_or_split_total_and_insecure_callback
-    assert_raises(Lunixi::ConfigurationError) { @sdk.payments.create_intent(payment_body.merge(amount: "50"), idempotency_key: idempotency_key) }
+    assert_raises(Lunixi::ConfigurationError) { @sdk.payments.create_intent(payment_body.merge(amount: '50'), idempotency_key: idempotency_key) }
     assert_raises(Lunixi::ConfigurationError) { @sdk.payments.create_intent(payment_body.merge(callbackUrl: 'http://merchant.example'), idempotency_key: idempotency_key) }
-    assert_raises(Lunixi::ConfigurationError) { @sdk.payments.split({ totalAmount: "100", currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: "80" }] }, idempotency_key: idempotency_key) }
+    assert_raises(Lunixi::ConfigurationError) { @sdk.payments.split({ totalAmount: '100', currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: '80' }] }, idempotency_key: idempotency_key) }
     assert_empty @transport.calls
   end
 
@@ -54,11 +54,11 @@ class PaymentsTest < Minitest::Test
   end
 
   def test_capture_refund_void_methods_and_split_refund_match_gateway_routes
-    @sdk.payments.capture('pay_1', amount: "50", idempotency_key: idempotency_key)
-    @sdk.payments.refund('pay_1', amount: "40", reason: 'Customer request', idempotency_key: idempotency_key)
+    @sdk.payments.capture('pay_1', amount: '50', idempotency_key: idempotency_key)
+    @sdk.payments.refund('pay_1', amount: '40', reason: 'Customer request', idempotency_key: idempotency_key)
     @sdk.payments.void('pay_1', idempotency_key: idempotency_key)
     @sdk.payments.methods(payment_method: 'MEAL_CARD')
-    @sdk.payments.refund_split('split_1', amount: "50", idempotency_key: idempotency_key)
+    @sdk.payments.refund_split('split_1', amount: '50', idempotency_key: idempotency_key)
     expected_paths = %w[
       /api/v1/payments/pay_1/capture /api/v1/payments/pay_1/refund /api/v1/payments/pay_1/void
       /api/v1/payments/methods /api/v1/payments/split/split_1/refund
@@ -68,7 +68,7 @@ class PaymentsTest < Minitest::Test
 
   def test_fraud_rejects_tenant_override_and_uses_documented_endpoint
     assert_raises(Lunixi::ConfigurationError) { @sdk.fraud.evaluate(tenantId: 'other_tenant') }
-    @sdk.fraud.evaluate(transactionRef: 'transaction_1', integrationMode: 'PAYMENT_GATEWAY', payment: { amount: "100", currency: 'TRY' })
+    @sdk.fraud.evaluate(transactionRef: 'transaction_1', integrationMode: 'PAYMENT_GATEWAY', payment: { amount: '100', currency: 'TRY' })
     assert_equal '/api/v1/fraud/decisions/evaluate', @transport.calls.last[:uri].path
     refute @transport.calls.last[:headers].key?('X-Signature')
   end

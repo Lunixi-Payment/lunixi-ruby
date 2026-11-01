@@ -1,6 +1,6 @@
 ---
 title: Ruby SDK
-description: Lunixi Ruby SDK — source installation, Ed25519 signing, payments, fraud, durable idempotency and raw-body v2 webhooks.
+description: Lunixi Ruby SDK — installation, Ed25519 signing, payments, fraud, durable idempotency and raw-body v2 webhooks.
 ---
 
 
@@ -8,20 +8,19 @@ description: Lunixi Ruby SDK — source installation, Ed25519 signing, payments,
 
 `lunixi-sdk` is a server-side Ruby client for Lunixi. It handles OpenSSL Ed25519 request signing, synchronized token caching, compact JavaScript-compatible JSON, safe retries and raw-body webhook verification. It works with Rails, Sinatra, Rack and plain Ruby. The core gem has no framework dependency; the executable [Rails integration](/sdks/rails) is included in the source repository.
 
-## Requirements and source installation
+## Requirements and installation
 
 Ruby **3.3+**, Bundler and an OpenSSL build supporting **Ed25519** are required. The Rails example uses Rails 8.1.
 
-> 
-Version 0.1.1 is distributed from source. RubyGems publication is a separate release step; a registry install is not assumed here.
+After 1.0.1 is available on RubyGems, add `gem 'lunixi-sdk', '1.0.1'` to your Gemfile and run `bundle install`. Follow the [money-string migration](../MIGRATION-1.0.md). The following source build is an optional development workflow:
 
 
 ```bash
-git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
+git clone --branch v1.0.1 --depth 1 https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.1.gem
+gem install ./lunixi-sdk-1.0.1.gem
 ```
 
 Source: [Lunixi-Payment/lunixi-ruby](https://github.com/Lunixi-Payment/lunixi-ruby). An application may also use a reviewed local checkout with `gem 'lunixi-sdk', path: '/absolute/path/to/lunixi-ruby'`. Pin an audited commit if you use a Bundler Git source.

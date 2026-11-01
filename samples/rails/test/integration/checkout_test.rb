@@ -22,7 +22,7 @@ class CheckoutTest < RailsFlowTest
     assert_includes response.body, "Lunixi.checkout.create(config).mount('#lunixi-checkout-form')"
     assert_includes response.headers['Content-Security-Policy'], 'script-src'
     assert_includes response.headers['Cache-Control'], 'no-store'
-    assert_equal 10_050, @payments.intents.first.first['amount']
+    assert_equal '10050', @payments.intents.first.first['amount']
     assert_equal @order.checkout_key, @payments.intents.first.last
     assert_equal({}, @payments.intents.first.first.fetch('metadata'))
     assert_equal 'embedded', @order.reload.checkout_mode

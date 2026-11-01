@@ -192,15 +192,19 @@ module Lunixi
       @sleeper.call(seconds)
     end
 
+    def response_payload(response)
+      payload = response.body.empty? ? {} : JSON.parse(response.body, max_nesting: 64)
+      raise ApiError.new(status: response.status, code: 'invalid_json_response') unless payload.is_a?(Hash)
+
+      payload
+    rescue JSON::ParserError
+      raise ApiError.new(status: response.status, code: 'invalid_json_response'), cause: nil
+    end
+
     def decode_response(response, binary: false, running_split: false, fiat: false)
       return response.body.b.freeze if binary && response.status.between?(200, 299)
 
-      begin
-        payload = response.body.empty? ? {} : JSON.parse(response.body, max_nesting: 64)
-      rescue JSON::ParserError
-        raise ApiError.new(status: response.status, code: 'invalid_json_response'), cause: nil
-      end
-      raise ApiError.new(status: response.status, code: 'invalid_json_response') unless payload.is_a?(Hash)
+      payload = response_payload(response)
       Money.validate_fields(payload, response: true) if fiat
       return payload if response.status.between?(200, 299)
 

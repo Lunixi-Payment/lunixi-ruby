@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-11-01
+
+- Align Rails sample API mocks and expectations with canonical minor-unit strings while preserving numeric-input rejection tests; runtime admission is unchanged.
+- Preserve response parsing limits and error handling in a private helper; close RuboCop findings without suppressions.
+- Update 1.0.1 installation and exact-tag publishing guidance.
+
 ## 1.0.0 — 2026-11-01
 
 - Reject explicit null capture/refund amounts; full remaining operations use omission or the dedicated API described in MIGRATION-1.0.md.

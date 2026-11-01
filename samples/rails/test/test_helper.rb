@@ -54,7 +54,7 @@ class RailsFlowTest < ActionDispatch::IntegrationTest
     post '/webhooks/lunixi', params: raw, headers: headers
   end
 
-  def captured_payment(amount: @order.amount_minor)
+  def captured_payment(amount: @order.amount_minor.to_s)
     { 'id' => 'intent_123', 'merchantId' => ENV.fetch('LUNIXI_MERCHANT_ID'), 'status' => 'CAPTURED', 'orderId' => @order.public_id,
       'amount' => amount, 'currency' => 'TRY' }
   end

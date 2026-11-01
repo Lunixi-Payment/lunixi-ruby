@@ -2,7 +2,7 @@
 
 # Lunixi Ruby SDK
 
-**1.0.0 is prepared and unreleased.** The examples below use the breaking canonical money-string API. Use the reviewed local source for this version; historical 0.x registry artifacts do not implement it. See [migration](MIGRATION-1.0.md).
+**Version 1.0.1 uses canonical minor-unit strings for money.** This is a breaking change from 0.x; update request and response handling together. See [migration](MIGRATION-1.0.md).
 
 [English](README.md) · [Türkçe](README.tr.md) · [Documentation](https://docs.lunixi.com/sdks/ruby) · [Rails sample](samples/rails)
 
@@ -12,11 +12,11 @@ Server-side Ruby client for Lunixi payments, fraud and signed gateway requests. 
 
 Ruby **3.3+**, OpenSSL with **Ed25519** support, and Bundler. The runnable Rails sample uses **Rails 8.1** and SQLite. The core gem does not depend on Rails.
 
-Version 1.0.0 is available only as reviewed source during preparation. Add a local path dependency, then run `bundle install`:
+After version 1.0.1 is available on RubyGems, add the dependency and run `bundle install`:
 
 ```ruby
 source 'https://rubygems.org'
-gem 'lunixi-sdk', '1.0.0', path: '/absolute/path/to/reviewed/entegrasyon/ruby'
+gem 'lunixi-sdk', '1.0.1'
 ```
 
 Keep `Gemfile.lock` to retain the reviewed dependency resolution.
@@ -101,7 +101,7 @@ lunixi.payments.refund('intent_123', amount: "2500",
 links = lunixi.request('GET', '/api/v1/payments/links', query: { limit: 20 })
 ```
 
-Historical release record: Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 0.1.2 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
+Payment, fraud and webhook helpers are explicit. Other products use the signed transport with the published gateway schema; version 1.0.1 does not claim full typed service-client parity with the PHP SDK. JSON is compact UTF-8 with JavaScript integer-index key ordering and compatible numeric formatting, so the signed bytes are exactly the transmitted bytes.
 
 ## Raw-body webhooks and durable deduplication
 
@@ -154,10 +154,10 @@ The Rails example defaults to `LUNIXI_CHECKOUT_MODE=embedded`. It renders the ex
 
 Set `LUNIXI_CHECKOUT_MODE=hosted` explicitly for optional redirect. `Lunixi::Checkout.payment_page_url(data.fetch('paymentPageUrl'))` and the Rails redirect wrapper validate the exact backend URL: HTTPS `pay.lunixi.com/payment/` followed by a 16–4096-character ASCII opaque value, with no userinfo, port, query, fragment or controls. It can differ from the embedded token. Do not construct a URL from that token. Both modes expose the same merchant-enabled form methods, multi-card, installments and insurance; these features do not require redirecting. The existing fixed-total single-intent settlement limitation still applies.
 
-Run `rails db:migrate` before deploying 1.0.0. New request/mode/callback and start time are persisted before network I/O; request/token/backend URL use Active Record Encryption. Retries reuse the saved body and key and stop financial dispatch after 23 hours. Existing rows are marked legacy hosted; unknown legacy requests or missing backend URLs remain reconciliation-only, without rewriting origin, resetting a key or inventing a URL. Global mode changes affect new reservations; existing requests retain their saved presentation. CSRF/demo authorization, raw webhooks, native receipt transactions and the bounded 3DS/split return adapter remain unchanged.
+Run `rails db:migrate` before deploying 1.0.1. New request/mode/callback and start time are persisted before network I/O; request/token/backend URL use Active Record Encryption. Retries reuse the saved body and key and stop financial dispatch after 23 hours. Existing rows are marked legacy hosted; unknown legacy requests or missing backend URLs remain reconciliation-only, without rewriting origin, resetting a key or inventing a URL. Global mode changes affect new reservations; existing requests retain their saved presentation. CSRF/demo authorization, raw webhooks, native receipt transactions and the bounded 3DS/split return adapter remain unchanged.
 
 Historical focused 0.1.2 verification: 24 Rails form/return/URL/CSP security tests with 225 assertions, 2 SDK helper tests with 5 assertions, RuboCop and Brakeman (one exact documented strict-URL redirect false positive). Prior full 0.1.1 results remain the baseline; live/merchant acceptance is deferred.
 
 The checkout page’s CSP permits form POSTs only to `'self'` and the configured gateway origin (default `https://api-gateway.lunixi.com`). This preserves wallet/provider and legacy POST handoffs supported by the browser SDK. For another reviewed provider, set server-only `LUNIXI_FORM_ACTION_ORIGINS` to a comma-separated list of exact HTTPS origins, without spaces, paths, trailing slashes, credentials, query, fragment or wildcards. Invalid configuration fails closed; gateway responses and browser fields never expand this list. Script nonces, frame/connect restrictions and informational return handling remain in force.
 
-The prepared 1.0.0 release is unreleased. See [the money-string migration](MIGRATION-1.0.md).
+Before upgrading from 0.x, follow [the money-string migration](MIGRATION-1.0.md).

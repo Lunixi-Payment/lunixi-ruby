@@ -1,6 +1,6 @@
 ---
 title: Ruby SDK
-description: Lunixi Ruby SDK — kaynak kurulum, Ed25519 imza, ödeme ve fraud, kalıcı idempotency ve özgün baytlarla v2 webhook doğrulama.
+description: Lunixi Ruby SDK — kurulum, Ed25519 imza, ödeme ve fraud, kalıcı idempotency ve özgün baytlarla v2 webhook doğrulama.
 ---
 
 
@@ -8,20 +8,19 @@ description: Lunixi Ruby SDK — kaynak kurulum, Ed25519 imza, ödeme ve fraud, 
 
 `lunixi-sdk`, Lunixi için sunucu tarafı Ruby istemcisidir. Ed25519 imzayı OpenSSL ile üretir; token’ı eşzamanlı istekler arasında saklar, kompakt JavaScript uyumlu JSON oluşturur, güvenli tekrar denemeleri ve özgün baytlarla webhook doğrulamayı sağlar. Rails, Sinatra, Rack ve düz Ruby ile çalışır. Ana gem çerçeveden bağımsızdır; kaynak depodaki çalıştırılabilir [Rails örneği](/sdks/rails) ayrı adaptördür.
 
-## Gereksinimler ve kaynak kurulum
+## Gereksinimler ve kurulum
 
 Ruby **3.3+**, Bundler ve **Ed25519** destekli OpenSSL gerekir. Rails örneği Rails 8.1 kullanır.
 
-> 
-0.1.1 kaynak kod üzerinden dağıtılır. RubyGems yayını ayrı bir sürüm adımıdır; aşağıdaki kurulum yayımlanmış bir registry paketi varsaymaz.
+1.0.1 RubyGems üzerinde kullanılabilir olduğunda Gemfile’a `gem 'lunixi-sdk', '1.0.1'` ekleyip `bundle install` çalıştırın. [Para sözleşmesi geçişini](../MIGRATION-1.0.md) uygulayın. Aşağıdaki kaynak derlemesi geliştirme için isteğe bağlıdır:
 
 
 ```bash
-git clone https://github.com/Lunixi-Payment/lunixi-ruby.git
+git clone --branch v1.0.1 --depth 1 https://github.com/Lunixi-Payment/lunixi-ruby.git
 cd lunixi-ruby
 bundle install
 gem build lunixi-sdk.gemspec
-gem install ./lunixi-sdk-0.1.1.gem
+gem install ./lunixi-sdk-1.0.1.gem
 ```
 
 Kaynak: [Lunixi-Payment/lunixi-ruby](https://github.com/Lunixi-Payment/lunixi-ruby). İncelenmiş yerel kopyayı `gem 'lunixi-sdk', path: '/tam/yol/lunixi-ruby'` ile kullanabilirsiniz. Bundler Git kaynağı kullanırken denetlenmiş commit’i sabitleyin.
