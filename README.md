@@ -12,7 +12,7 @@ Server-side Ruby client for Lunixi payments, fraud and signed gateway requests. 
 
 Ruby **3.3+**, OpenSSL with **Ed25519** support, and Bundler. The runnable Rails sample uses **Rails 8.1** and SQLite. The core gem does not depend on Rails.
 
-After version 1.0.1 is available on RubyGems, add the dependency and run `bundle install`:
+Add the published [1.0.1 dependency from RubyGems](https://rubygems.org/gems/lunixi-sdk/versions/1.0.1) and run `bundle install`:
 
 ```ruby
 source 'https://rubygems.org'

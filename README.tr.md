@@ -10,7 +10,7 @@ Lunixi ödemeleri, fraud işlemleri ve imzalı gateway çağrıları için sunuc
 
 Ruby **3.3+**, **Ed25519** destekli OpenSSL ve Bundler gerekir. Çalıştırılabilir örnek **Rails 8.1** ve SQLite kullanır; ana gem Rails’e bağımlı değildir.
 
-1.0.1 [RubyGems](https://rubygems.org/gems/lunixi-sdk) üzerinde kullanılabilir olduğunda `Gemfile` dosyanıza tam sürümü ekleyip `bundle install` çalıştırın. [Para sözleşmesi geçişini](MIGRATION-1.0.md) uygulayın:
+[RubyGems üzerinde yayımlanan 1.0.1 sürümünü](https://rubygems.org/gems/lunixi-sdk/versions/1.0.1) `Gemfile` dosyanıza ekleyip `bundle install` çalıştırın. [Para sözleşmesi geçişini](MIGRATION-1.0.md) uygulayın:
 
 ```ruby
 source 'https://rubygems.org'
