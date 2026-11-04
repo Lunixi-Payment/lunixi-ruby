@@ -14,6 +14,16 @@ module Lunixi
     end
 
     # Create hosted/embedded checkout using integer minor units and a durable attempt key.
+    #
+    # Optional +enabledInstallments+ (an Array of Integer) lists the installment counts the hosted
+    # form may offer for this payment, e.g. <tt>[1, 2, 3]</tt>; <tt>[1]</tt> allows a single payment
+    # only. The form shows only the counts also allowed by the panel settings, the card and the
+    # platform maximum. Leave it out for no restriction. Send distinct integers 1–36 that include 1,
+    # in ascending order; the gateway rejects any other list, an empty one included, with 400.
+    #
+    # @param body [Hash] gateway body: +amount+ (canonical minor-unit string), +currency+, +orderId+
+    #   and optional fields such as +callbackUrl+ and +enabledInstallments+
+    # @param idempotency_key [String] the persisted key of this checkout attempt
     # @return [Hash] Unmodified gateway response envelope; creation is not settlement.
     def create_intent(body, idempotency_key:)
       body = payment_body!(body)

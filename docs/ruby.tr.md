@@ -77,7 +77,7 @@ checkout_token = result.fetch('data').fetch('token')
 Intent/token, HTTP 2xx, dönüş sayfası veya ara split durumu tahsilat kanıtı değildir. İmzalı webhook’u kalıcı siparişle eşleştirin; sunucudan ödeme sorgusunda nihai durum, tutar ve para birimi uyuşmadan siparişi tamamlamayın.
 
 
-Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır. Kök `price`/`paidPrice` null olsa bile reddedilir. Sepet ve split bacak toplamları ana toplamla aynı olmalıdır. Intent’te `installment` gönderilmez; taksit formda seçilir. `preauth: true` provizyon ister; capture ayrı işlemdir.
+Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır. Kök `price`/`paidPrice` null olsa bile reddedilir. Sepet ve split bacak toplamları ana toplamla aynı olmalıdır. Intent’te `installment` gönderilmez; taksit formda seçilir. İsteğe bağlı `enabledInstallments` listesi (1–36 arası, tekrarsız, 1'i içeren, artan sıralı tamsayılar; `[1]` = yalnız tek çekim) bir ödeme için formun sunacağı sayıları yalnızca daraltır. `preauth: true` provizyon ister; capture ayrı işlemdir.
 
 ## Yardımcı API’ler
 

@@ -58,14 +58,15 @@ Toplamı sunucuda hesaplayın. Çağrıdan **önce** ödeme denemesine bir UUID 
 result = lunixi.payments.create_intent(
   { amount: "10050", currency: 'TRY', orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'urun-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }] },
+    basketItems: [{ id: 'urun-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }],
+    enabledInstallments: [1, 2, 3] }, # isteğe bağlı: en fazla 3 taksit
   idempotency_key: order.persisted_payment_attempt_key
 )
 intent_id = result.fetch('data').fetch('paymentId')
 checkout_token = result.fetch('data').fetch('token')
 ```
 
-`"10050"`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır; sayısal değerler kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
+`"10050"`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır; sayısal değerler kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. İsteğe bağlı `enabledInstallments` listesi, bir ödeme için formun sunacağı taksit sayılarını yalnızca daraltır (`[1]` = yalnız tek çekim); form, panel ayarlarınızın, kartın ve platform üst sınırının da izin verdiği sayıları gösterir. Kısıt istemiyorsanız alanı göndermeyin. 1–36 arası, tekrarsız ve 1'i içeren tamsayıları artan sırada gönderin; gateway başka bir listeyi (boş liste dahil) 400 ile reddeder. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
 
 Varsayılan form mağaza içinde açılır; isteğe bağlı yönlendirme yalnız doğrulanmış backend `paymentPageUrl` adresini kullanır. Token ve adres şifrelenir; iki mod aynı Lunixi form ayarlarını paylaşır. PAN/CVV toplamayın.
 

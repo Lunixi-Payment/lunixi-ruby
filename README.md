@@ -60,7 +60,8 @@ result = lunixi.payments.create_intent(
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }]
+    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }],
+    enabledInstallments: [1, 2, 3] # optional: at most 3 installments
   },
   idempotency_key: order.persisted_payment_attempt_key
 )
@@ -91,7 +92,7 @@ The shared Lunixi form owns enabled payment methods and supports the methods con
 | Fraud transaction event | `fraud.record_event(body, idempotency_key:)` |
 | Other documented endpoints | `request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false)` |
 
-`amount`, split `totalAmount` and each leg/item price must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price`/`paidPrice` are removed fields and rejected even when null. Basket and split totals must agree. Intent installments belong to the checkout form; `installment` is rejected on intent creation. Set `preauth: true` for authorization, then capture separately with a new durable operation key. Omitting the capture/refund `amount:` keyword asks the gateway to use the remaining amount; explicit nil, numeric, zero, false and noncanonical string amounts are rejected.
+`amount`, split `totalAmount` and each leg/item price must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price`/`paidPrice` are removed fields and rejected even when null. Basket and split totals must agree. Intent installments belong to the checkout form; `installment` is rejected on intent creation. The optional `enabledInstallments` list only narrows the installment counts the form offers for one payment (`[1]` = single payment only); the form shows only the counts your panel settings, the card and the platform maximum also allow. Leave it out for no restriction. Send distinct integers 1–36 that include 1, in ascending order; the gateway rejects any other list (an empty list included) with 400. Set `preauth: true` for authorization, then capture separately with a new durable operation key. Omitting the capture/refund `amount:` keyword asks the gateway to use the remaining amount; explicit nil, numeric, zero, false and noncanonical string amounts are rejected.
 
 ```ruby
 lunixi.payments.refund('intent_123', amount: "2500",

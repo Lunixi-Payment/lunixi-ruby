@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 — 2026-11-04
+
+- Document the optional `enabledInstallments` field of the `create_intent` body: the installment counts the hosted form may offer for one payment (`[1]` = single payment only). It only narrows the panel settings, the card and the platform maximum; leaving it out means no restriction. The body is sent unchanged; send distinct integers 1–36 that include 1, in ascending order (the gateway answers any other list with 400).
+
 ## 1.0.1 — 2026-11-01
 
 - Align Rails sample API mocks and expectations with canonical minor-unit strings while preserving numeric-input rejection tests; runtime admission is unchanged.

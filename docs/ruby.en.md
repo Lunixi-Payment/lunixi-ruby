@@ -77,7 +77,7 @@ checkout_token = result.fetch('data').fetch('token')
 An intent/token, HTTP 2xx, return URL or intermediate split state does not prove capture. Correlate a verified webhook with the persisted order and authenticate a payment status read; confirm final status, amount and currency before fulfillment.
 
 
-Amounts must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price` and `paidPrice` are rejected even when null. Basket prices and split leg amounts must equal the relevant total. Intent `installment` is rejected because installments are selected in the checkout form. `preauth: true` requests authorization; capture is a separate operation.
+Amounts must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price` and `paidPrice` are rejected even when null. Basket prices and split leg amounts must equal the relevant total. Intent `installment` is rejected because installments are selected in the checkout form; the optional `enabledInstallments` list (distinct integers 1–36 including 1, ascending; `[1]` = single payment only) only narrows the counts the form offers for one payment. `preauth: true` requests authorization; capture is a separate operation.
 
 ## Available helpers
 
