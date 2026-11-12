@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-11-12
+
+- Packaging-only release of 1.2.0 (RuboCop: no trailing comma in `ProductCategory::ALL`). No API change.
+
 ## 1.2.0 — 2026-11-12
 
 - Document the optional `basketItems[].productCategory` field of the `create_intent` body: the Lunixi product category code, used by payment methods with legal installment limits (e.g. shopping loan) and other platform features. The body is sent unchanged; leaving it out keeps today's behaviour, and the gateway answers an unknown code with 400.

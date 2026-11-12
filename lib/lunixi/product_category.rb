@@ -89,7 +89,7 @@ module Lunixi
       GIFT_CARD,
       SUBSCRIPTION,
       SERVICE_OTHER,
-      OTHER,
+      OTHER
     ].freeze
   end
 end
