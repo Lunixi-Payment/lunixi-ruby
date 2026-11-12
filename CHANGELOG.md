@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0 — 2026-11-12
+
+- Document the optional `basketItems[].productCategory` field of the `create_intent` body: the Lunixi product category code, used by payment methods with legal installment limits (e.g. shopping loan) and other platform features. The body is sent unchanged; leaving it out keeps today's behaviour, and the gateway answers an unknown code with 400.
+- `Lunixi::ProductCategory`: the 40 product category codes as frozen string constants (e.g. `Lunixi::ProductCategory::MOBILE_PHONE`) and the frozen `Lunixi::ProductCategory::ALL` in dictionary order. The list only grows by appending; values are not checked against it before sending.
+
 ## 1.1.0 — 2026-11-04
 
 - Document the optional `enabledInstallments` field of the `create_intent` body: the installment counts the hosted form may offer for one payment (`[1]` = single payment only). It only narrows the panel settings, the card and the platform maximum; leaving it out means no restriction. The body is sent unchanged; send distinct integers 1–36 that include 1, in ascending order (the gateway answers any other list with 400).
