@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 — 2026-11-12
+
+- Development lockfile only: Rails sample dependencies moved to patched versions (rails 8.1.4.1, nokogiri 1.19.7, loofah 2.25.3, rails-html-sanitizer 1.7.2) for new security advisories. The gem itself and its runtime dependencies are unchanged.
+
 ## 1.2.1 — 2026-11-12
 
 - Packaging-only release of 1.2.0 (RuboCop: no trailing comma in `ProductCategory::ALL`). No API change.
