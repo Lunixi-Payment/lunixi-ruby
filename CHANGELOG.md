@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1 — 2026-11-15
+
+- Lint (RuboCop) clean and `Gemfile.lock` carries the gem version, so the release builds in CI; no behaviour change.
+
 ## 1.3.0 — 2026-11-15
 
 - `payments.direct_method_payment(body_or_request, idempotency_key:)` and `Lunixi::DirectMethodPaymentRequest`: start a payment with any method (`POST /payments/direct/payment`, signed). Raw and built bodies are checked before sending: known fields, only the chosen method's block, card fields only with `CARD`, block structure, promissory-note plan, 1–100 basket items for `SHOPPING_LOAN`, no `providerCode` for `BANK_TRANSFER`; the idempotency key is required.

@@ -128,14 +128,14 @@ module Lunixi
   session_fields = %w[externalCustomerId customerMode customer jurisdiction requiredDocumentTypes primaryDocumentType evidencePurpose ttlMinutes
                       idempotencyKey evidenceContextJson].freeze
   route = lambda do |method, path, **extra|
-    RouteRequest.route(method, path, **{ step_up: false, idempotency_key: 'none' }.merge(extra))
+    RouteRequest.route(method, path, step_up: false, idempotency_key: 'none', **extra)
   end
 
   # Every KYC route the SDK calls (access token only). The same table as the Node SDK's KYC_ROUTES; the
   # parity test compares it with the shared catalog.
   KYC_ROUTES = {
     'createSession' => route.call('POST', "#{kyc_base}/sessions", idempotency_key: 'optional', required: %w[subjectId sessionType],
-                                                                 optional: session_fields),
+                                                                  optional: session_fields),
     'getSession' => route.call('GET', "#{kyc_base}/sessions/:sessionId"),
     # The merchant list takes only these two; an unknown filter is a 400 on the gateway.
     'listSessions' => route.call('GET', "#{kyc_base}/sessions", query: %w[limit cursor]),
@@ -147,7 +147,7 @@ module Lunixi
     'submit' => route.call('POST', "#{kyc_base}/sessions/:sessionId/submit"),
     'manualReview' => route.call('POST', "#{kyc_base}/sessions/:sessionId/manual-review", optional: %w[reasonCode reasonDetail], optional_body: true),
     'evidenceRequest' => route.call('POST', "#{kyc_base}/evidence-requests", idempotency_key: 'optional', required: %w[subjectId sessionType],
-                                                                            optional: session_fields),
+                                                                             optional: session_fields),
     'merchantPolicy' => route.call('GET', "#{kyc_base}/admin/merchant-policy"),
     'updateMerchantPolicy' => route.call('POST', "#{kyc_base}/admin/merchant-policy", free: true),
     'rotateWebhookSecret' => route.call('POST', "#{kyc_base}/admin/merchant-policy/webhook-secret/rotate"),

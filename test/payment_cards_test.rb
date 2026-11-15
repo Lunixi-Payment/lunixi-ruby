@@ -133,7 +133,7 @@ class PaymentCardsTest < Minitest::Test
     @sdk.payments.create_marketplace_intent(marketplace_body, idempotency_key: idempotency_key)
     sent = @transport.calls.last
     assert_equal ['POST', '/api/v1/payments/marketplace/intents'], [sent[:method], sent[:uri].path]
-    assert_equal %w[6000 4000], JSON.parse(sent[:body])['sellers'].map { |seller| seller['amountMinor'] }
+    assert_equal(%w[6000 4000], JSON.parse(sent[:body])['sellers'].map { |seller| seller['amountMinor'] })
     assert_equal idempotency_key, sent[:headers]['Idempotency-Key']
     assert sent[:headers].key?('X-Signature')
   end

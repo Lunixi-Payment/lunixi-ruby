@@ -90,7 +90,7 @@ class MarketplaceTest < Minitest::Test
 
   def test_charge_errors_never_carry_card_data
     [
-      -> { @marketplace.charge_marketplace_card2d(charge_request.reject { |key, _| key == :buyer }, legs) },
+      -> { @marketplace.charge_marketplace_card2d(charge_request.except(:buyer), legs) },
       -> { @marketplace.charge_marketplace_card2d(charge_request.merge(basketItems: []), legs) },
       -> { @marketplace.charge_marketplace_card2d(charge_request.merge(amount: 100_000), legs) },
       -> { @marketplace.charge_marketplace_card2d(charge_request.merge(preauth: 'yes'), legs) },

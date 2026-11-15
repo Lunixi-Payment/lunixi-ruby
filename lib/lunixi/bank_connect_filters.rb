@@ -36,9 +36,9 @@ module Lunixi
       when 'direction' then one_of(key, value, BankTransactionDirection::ALL)
       when 'canonicalType' then list_of(key, value, BankTransactionType::ALL)
       when 'accountId' then account_ids(value)
-      when 'bankId', 'connectionId' then RouteRequest.text!(value, key)
-      when 'currency' then RouteRequest.currency!(value, key)
-      when 'bookedFrom', 'bookedTo' then RouteRequest.iso_time!(value, key)
+      when 'bankId', 'connectionId' then RouteValue.text!(value, key)
+      when 'currency' then RouteValue.currency!(value, key)
+      when 'bookedFrom', 'bookedTo' then RouteValue.iso_time!(value, key)
       else amount(key, value)
       end
     end
@@ -47,8 +47,8 @@ module Lunixi
       case key
       when 'limit', 'cursor' then page_value(key, value)
       when 'status' then list_of(key, value, route == 'listFxOrders' ? BankFxOrderStatus::ALL : BankTransferStatus::ALL)
-      when 'accountId' then RouteRequest.text!(value, key)
-      else RouteRequest.iso_time!(value, key)
+      when 'accountId' then RouteValue.text!(value, key)
+      else RouteValue.iso_time!(value, key)
       end
     end
 
@@ -75,9 +75,7 @@ module Lunixi
 
     def account_ids(value)
       ids = Array(value)
-      if ids.length > BANK_CONNECT_MAX_ACCOUNT_FILTER
-        raise ConfigurationError, "'accountId' takes at most #{BANK_CONNECT_MAX_ACCOUNT_FILTER} account ids."
-      end
+      raise ConfigurationError, "'accountId' takes at most #{BANK_CONNECT_MAX_ACCOUNT_FILTER} account ids." if ids.length > BANK_CONNECT_MAX_ACCOUNT_FILTER
 
       ids.map do |id|
         raise ConfigurationError, "'accountId' must be account ids (strings without commas)." unless id.is_a?(String) && !id.strip.empty? && !id.include?(',')
@@ -98,8 +96,8 @@ module Lunixi
     def check_transaction_window!(query)
       raise ConfigurationError, "'bookedTo' needs 'bookedFrom': a window without a start is unbounded." if query.key?('bookedTo') && !query.key?('bookedFrom')
 
-      from = RouteRequest.instant(query['bookedFrom'])
-      to = RouteRequest.instant(query['bookedTo'])
+      from = RouteValue.instant(query['bookedFrom'])
+      to = RouteValue.instant(query['bookedTo'])
       if from && to
         raise ConfigurationError, "'bookedFrom' must not be after 'bookedTo'." if from > to
         if to - from > BANK_CONNECT_BOOKED_RANGE_MAX_DAYS * DAY_SECONDS

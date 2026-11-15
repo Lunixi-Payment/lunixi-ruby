@@ -39,8 +39,8 @@ module Lunixi
     def create_checkout_intent(request, sellers, multi_seller_policy: MarketplaceMultiSellerPolicy::ALL_OR_NOTHING, idempotency_key: nil)
       body = split_body(payload!(request, 'create_checkout_intent request'), sellers, multi_seller_policy)
       response = @routes.call('createCheckoutIntent', body: body, idempotency_key: idempotency_key)
-      intent = RouteRequest.merge_root(response)
-      return response if RouteRequest.text(intent['token']) || RouteRequest.text(intent['checkoutFormContent'])
+      intent = RouteResponse.merge_root(response)
+      return response if RouteResponse.text(intent['token']) || RouteResponse.text(intent['checkoutFormContent'])
 
       raise ApiError.new(status: intent['statusCode'].is_a?(Integer) ? intent['statusCode'] : 0, code: intent['code'],
                          request_id: intent['requestId'], message: 'The marketplace checkout intent did not return a token or a checkout form.')
@@ -72,7 +72,7 @@ module Lunixi
     # itself (KYC, IBAN, contract) before it is ACTIVE.
     def create_dealer(request)
       body = RouteRequest.wire_hash!(request, 'createDealer request')
-      RouteRequest.one_of!(body['dealerType'], MarketplaceDealerType::ALL, 'dealerType') if body.key?('dealerType')
+      RouteValue.one_of!(body['dealerType'], MarketplaceDealerType::ALL, 'dealerType') if body.key?('dealerType')
       @routes.data('createDealer', body: body)
     end
 
@@ -94,14 +94,14 @@ module Lunixi
     end
 
     def update_dealer_status(dealer_id, status)
-      RouteRequest.one_of!(status, MarketplaceDealerStatus::ALL, 'status')
+      RouteValue.one_of!(status, MarketplaceDealerStatus::ALL, 'status')
       @routes.data('updateDealerStatus', params: { 'dealerId' => dealer_id }, body: { 'status' => status })
     end
 
     # Self-onboarding link: { token, url, ... } (token also starts the embedded onboarding SDK).
     # Lunixi::Marketplace.onboarding_url(link) gives the URL.
     def onboarding_token(dealer_id)
-      RouteRequest.merge_root(@routes.call('onboardingToken', params: { 'dealerId' => dealer_id }))
+      RouteResponse.merge_root(@routes.call('onboardingToken', params: { 'dealerId' => dealer_id }))
     end
 
     # Onboarding / application status.
@@ -159,15 +159,15 @@ module Lunixi
     # The effective commission of a dealer (and category) at a month-to-date volume (mtd_volume_minor, a
     # minor-unit string).
     def resolve_commission(sub_dealer_id, category_code: nil, mtd_volume_minor: nil)
-      query = RouteRequest.compact('subDealerId' => RouteRequest.text!(sub_dealer_id, 'subDealerId'),
-                                   'categoryCode' => RouteRequest.optional_text(category_code, 'categoryCode'), 'mtdVolumeMinor' => mtd_volume_minor)
+      query = RouteRequest.compact('subDealerId' => RouteValue.text!(sub_dealer_id, 'subDealerId'),
+                                   'categoryCode' => RouteValue.optional_text(category_code, 'categoryCode'), 'mtdVolumeMinor' => mtd_volume_minor)
       @routes.data('resolveCommission', query: query)
     end
 
     # A manual payout: { subDealerId, amountMinor, currency, reference?, ... }.
     def create_payout(payload)
       body = RouteRequest.wire_hash!(payload, 'createPayout payload')
-      Money.wire_minor!(body['amountMinor'], 'amountMinor') if body.key?('amountMinor')
+      WireMoney.wire_minor!(body['amountMinor'], 'amountMinor') if body.key?('amountMinor')
       @routes.data('createPayout', body: body)
     end
 
@@ -179,7 +179,7 @@ module Lunixi
     def bulk_mark_payouts_paid(payout_ids, extra = {})
       raise ConfigurationError, 'bulk_mark_payouts_paid needs a non-empty array of payout ids.' unless payout_ids.is_a?(Array) && !payout_ids.empty?
 
-      ids = payout_ids.each_with_index.map { |id, index| RouteRequest.text!(id, "payoutIds[#{index}]") }
+      ids = payout_ids.each_with_index.map { |id, index| RouteValue.text!(id, "payoutIds[#{index}]") }
       @routes.data('bulkMarkPayoutsPaid', body: RouteRequest.wire_hash!(extra, 'bulk_mark_payouts_paid extra').merge('payoutIds' => ids))
     end
 
@@ -224,7 +224,7 @@ module Lunixi
       end
 
       charge_amount!(body)
-      RouteRequest.one_of!(multi_seller_policy, MarketplaceMultiSellerPolicy::ALL, 'multiSellerPolicy')
+      RouteValue.one_of!(multi_seller_policy, MarketplaceMultiSellerPolicy::ALL, 'multiSellerPolicy')
       raise ConfigurationError, 'A marketplace split requires at least one seller leg.' unless sellers.is_a?(Array) && !sellers.empty?
 
       legs = sellers.each_with_index.map { |seller, index| seller_leg(seller, index) }
@@ -239,8 +239,8 @@ module Lunixi
     def seller_leg(seller, index)
       label = "sellers[#{index}]"
       leg = RouteRequest.wire_keys!(seller.is_a?(Hash) ? seller : payload!(seller, label), MARKETPLACE_SELLER_FIELDS, label)
-      out = { 'subDealerId' => RouteRequest.text!(leg['subDealerId'], "#{label}.subDealerId"),
-              'amountMinor' => Money.wire_minor!(leg['amountMinor'], "#{label}.amountMinor") }
+      out = { 'subDealerId' => RouteValue.text!(leg['subDealerId'], "#{label}.subDealerId"),
+              'amountMinor' => WireMoney.wire_minor!(leg['amountMinor'], "#{label}.amountMinor") }
       if leg.key?('scenario')
         raise ConfigurationError, "'#{label}.scenario' must be a Hash." unless leg['scenario'].is_a?(Hash)
 
@@ -253,11 +253,9 @@ module Lunixi
     # preauth is a boolean; the other money members are canonical.
     def charge_amount!(body)
       sent = REMOVED_AMOUNT_FIELDS.select { |field| body.key?(field) }
-      unless sent.empty?
-        raise ConfigurationError, "#{sent.join(', ')}: removed from the payment body; send the amount only in 'amount' (minor units)."
-      end
+      raise ConfigurationError, "#{sent.join(', ')}: removed from the payment body; send the amount only in 'amount' (minor units)." unless sent.empty?
 
-      Money.wire_minor!(body['amount'], 'amount')
+      WireMoney.wire_minor!(body['amount'], 'amount')
       raise ConfigurationError, "'preauth' must be true or false." if body.key?('preauth') && ![true, false].include?(body['preauth'])
 
       Money.validate_fields(body)

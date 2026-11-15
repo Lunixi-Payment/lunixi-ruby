@@ -59,19 +59,19 @@ module Lunixi
     end
 
     def iterate_sessions(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_sessions(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_sessions(**query) }
     end
 
     # Applicant jurisdiction (ISO country) on a server-created session.
     def set_jurisdiction(session_id, jurisdiction)
       @routes.data('setJurisdiction', params: { 'sessionId' => session_id },
-                                      body: { 'jurisdiction' => RouteRequest.text!(jurisdiction, 'jurisdiction') })
+                                      body: { 'jurisdiction' => RouteValue.text!(jurisdiction, 'jurisdiction') })
     end
 
     # PASSPORT, NATIONAL_ID, DRIVERS_LICENSE or RESIDENCE_PERMIT.
     def set_primary_document(session_id, document_type)
       @routes.data('setPrimaryDocument', params: { 'sessionId' => session_id },
-                                         body: { 'documentType' => RouteRequest.text!(document_type, 'documentType') })
+                                         body: { 'documentType' => RouteValue.text!(document_type, 'documentType') })
     end
 
     # Server-side document upload (most flows use the browser SDK): { documentType, fileBase64, mimeType,
@@ -92,8 +92,8 @@ module Lunixi
     end
 
     def manual_review(session_id, reason_code: nil, reason_detail: nil)
-      body = RouteRequest.compact('reasonCode' => RouteRequest.optional_text(reason_code, 'reasonCode'),
-                                  'reasonDetail' => RouteRequest.optional_text(reason_detail, 'reasonDetail'))
+      body = RouteRequest.compact('reasonCode' => RouteValue.optional_text(reason_code, 'reasonCode'),
+                                  'reasonDetail' => RouteValue.optional_text(reason_detail, 'reasonDetail'))
       @routes.data('manualReview', params: { 'sessionId' => session_id }, body: body)
     end
 
@@ -145,7 +145,7 @@ module Lunixi
       metadata = body.delete('metadata')
       key = RouteTable.idempotency_key_of(name, body, idempotency_key)
       body['idempotencyKey'] = key.strip if key.is_a?(String) && !key.strip.empty?
-      body['sessionType'] = RouteRequest.one_of!(body['sessionType'].to_s.upcase, KycSessionType::ALL, 'sessionType') if body.key?('sessionType')
+      body['sessionType'] = RouteValue.one_of!(body['sessionType'].to_s.upcase, KycSessionType::ALL, 'sessionType') if body.key?('sessionType')
       customer!(name, body, person, company)
       evidence_context!(name, body, metadata)
       check_session_fields!(body)
@@ -175,7 +175,7 @@ module Lunixi
         end
       end
       types = body['requiredDocumentTypes']
-      return if types.nil? || (types.is_a?(Array) && types.all? { |type| type.is_a?(String) })
+      return if types.nil? || (types.is_a?(Array) && types.all?(String))
 
       raise ConfigurationError, "'requiredDocumentTypes' must be an array of document types."
     end

@@ -18,8 +18,8 @@ class PhysicalPosWebhookTest < Minitest::Test
     [body, { 'X-Lunixi-Event-Id' => event_id, 'X-Lunixi-Signature-Timestamp' => timestamp, 'X-Lunixi-Signature' => "v2=#{signature}" }]
   end
 
-  def parse(envelope, **options)
-    body, headers = signed(envelope, **options)
+  def parse(envelope, **)
+    body, headers = signed(envelope, **)
     Lunixi::PhysicalPos.parse_webhook_event(body, headers, @verifier)
   end
 

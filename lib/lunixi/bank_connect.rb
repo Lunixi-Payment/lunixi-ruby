@@ -37,7 +37,7 @@ module Lunixi
     end
 
     def iterate_banks(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_banks(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_banks(**query) }
     end
 
     # Your bank connections, newest first. status takes one value or an Array.
@@ -46,7 +46,7 @@ module Lunixi
     end
 
     def iterate_connections(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_connections(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_connections(**query) }
     end
 
     # 404 bank_connect.connection.not_found for an unknown connection.
@@ -60,7 +60,7 @@ module Lunixi
     end
 
     def iterate_accounts(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_accounts(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_accounts(**query) }
     end
 
     # 404 bank_connect.account.not_found for an unknown account.
@@ -74,7 +74,7 @@ module Lunixi
     # bank_account.transaction.received webhook. 409 bank_connect.connection.not_active when the
     # connection is not ACTIVE or DEGRADED; 429 RATE_LIMITED (RateLimitError, retry_after in seconds).
     def request_sync(account_id)
-      RouteRequest.unwrap(@client.request('POST', "#{BASE}/accounts/#{segment(account_id, 'accountId')}/sync"))
+      RouteResponse.unwrap(@client.request('POST', "#{BASE}/accounts/#{segment(account_id, 'accountId')}/sync"))
     end
 
     # The latest balance of each account (bank-connect:transactions:view). Without accountId, every active
@@ -84,7 +84,7 @@ module Lunixi
     end
 
     def iterate_balances(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_balances(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_balances(**query) }
     end
 
     # Transactions, newest recorded first (receivedAt, which never changes, so paging forward never
@@ -97,7 +97,7 @@ module Lunixi
     end
 
     def iterate_transactions(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_transactions(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_transactions(**query) }
     end
 
     # One transaction with its detail fields (balanceAfterMinor, documentNo, bank).
@@ -112,11 +112,11 @@ module Lunixi
     private
 
     def page(path, route, filters)
-      RouteRequest.page(@client.request('GET', BASE + path, query: BankConnectFilters.read_query!(filters, route)))
+      RouteResponse.page(@client.request('GET', BASE + path, query: BankConnectFilters.read_query!(filters, route)))
     end
 
     def read(path)
-      RouteRequest.unwrap(@client.request('GET', BASE + path))
+      RouteResponse.unwrap(@client.request('GET', BASE + path))
     end
 
     def segment(value, field)
@@ -139,7 +139,7 @@ module Lunixi
     # Payment purpose codes the bank accepts on this connection: { items: [{ code, name, order }] }. Pass
     # one as paymentPurpose to create; leave it out for the bank's default.
     def list_purposes(connection_id)
-      @invoker.data('listTransferPurposes', query: { 'connectionId' => RouteRequest.text!(connection_id, 'connectionId') })
+      @invoker.data('listTransferPurposes', query: { 'connectionId' => RouteValue.text!(connection_id, 'connectionId') })
     end
 
     # Creates an outgoing transfer (HTTP 201): { transfer, stepUp, replayed }. request: accountId,
@@ -165,7 +165,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     # 404 bank_connect.transfer.not_found for an unknown id.
@@ -191,7 +191,7 @@ module Lunixi
 
     # Current rates on the connection: { items, refreshSeconds, fetchedAt }; rates are decimal strings.
     def list_rates(connection_id)
-      @invoker.data('listFxRates', query: { 'connectionId' => RouteRequest.text!(connection_id, 'connectionId') })
+      @invoker.data('listFxRates', query: { 'connectionId' => RouteValue.text!(connection_id, 'connectionId') })
     end
 
     # Quotes an exchange (HTTP 201). request: sourceAccountId (you sell from it), targetAccountId (you buy
@@ -222,7 +222,7 @@ module Lunixi
     end
 
     def iterate_orders(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_orders(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_orders(**query) }
     end
 
     # 404 bank_connect.fx.order_not_found for an unknown id.
@@ -240,16 +240,16 @@ module Lunixi
   # a network error or a 5xx. Not a public API.
   class BankTransferInvoker
     def self.check_transfer!(body)
-      if body['receiverIban'].length > BANK_TRANSFER_IBAN_MAX
-        raise ConfigurationError, "'receiverIban' must be at most #{BANK_TRANSFER_IBAN_MAX} characters."
-      end
+      raise ConfigurationError, "'receiverIban' must be at most #{BANK_TRANSFER_IBAN_MAX} characters." if body['receiverIban'].length > BANK_TRANSFER_IBAN_MAX
       unless body['receiverName'].length.between?(BANK_TRANSFER_RECEIVER_NAME_MIN, BANK_TRANSFER_RECEIVER_NAME_MAX)
         raise ConfigurationError, "'receiverName' must be #{BANK_TRANSFER_RECEIVER_NAME_MIN}-#{BANK_TRANSFER_RECEIVER_NAME_MAX} characters."
       end
-      body['currency'] = RouteRequest.currency!(body['currency'], 'currency') if body.key?('currency')
+
+      body['currency'] = RouteValue.currency!(body['currency'], 'currency') if body.key?('currency')
       if body.key?('paymentPurpose') && !(body['paymentPurpose'].is_a?(String) && body['paymentPurpose'].match?(BANK_TRANSFER_PAYMENT_PURPOSE_PATTERN))
         raise ConfigurationError, "'paymentPurpose' must be a code from list_purposes (letters, digits, underscore; at most 64)."
       end
+
       check_description!(body['description']) if body.key?('description')
       body
     end
@@ -283,22 +283,22 @@ module Lunixi
       missing = route['required'].reject { |key| body.key?(key) }
       raise ConfigurationError, "#{name} requires #{missing.join(', ')}." unless missing.empty?
 
-      route['required'].each { |key| body[key] = RouteRequest.text!(body[key], key) unless BANK_TRANSFER_AMOUNT_FIELDS.include?(key) }
+      route['required'].each { |key| body[key] = RouteValue.text!(body[key], key) unless BANK_TRANSFER_AMOUNT_FIELDS.include?(key) }
       body
     end
 
     def data(name, params: {}, query: {})
       route = BANK_TRANSFER_ROUTES.fetch(name)
-      RouteRequest.unwrap(@client.request(route['method'], RouteRequest.path!(route['path'], params), query: query))
+      RouteResponse.unwrap(@client.request(route['method'], RouteRequest.path!(route['path'], params), query: query))
     end
 
     def page(name, query:)
       route = BANK_TRANSFER_ROUTES.fetch(name)
-      RouteRequest.page(@client.request(route['method'], route['path'], query: query))
+      RouteResponse.page(@client.request(route['method'], route['path'], query: query))
     end
 
     def post(name, body)
-      RouteRequest.unwrap(@client.request('POST', BANK_TRANSFER_ROUTES.fetch(name)['path'], body: body))
+      RouteResponse.unwrap(@client.request('POST', BANK_TRANSFER_ROUTES.fetch(name)['path'], body: body))
     end
 
     # 1 + max_retries attempts with the same key and body; a network error or a 5xx is retried, anything
@@ -308,7 +308,7 @@ module Lunixi
       path = BANK_TRANSFER_ROUTES.fetch(name)['path']
       attempt = 0
       begin
-        RouteRequest.unwrap(@client.request('POST', path, body: body, idempotency_key: key, max_retries: 0))
+        RouteResponse.unwrap(@client.request('POST', path, body: body, idempotency_key: key, max_retries: 0))
       rescue TransportError, ApiError => e
         raise with_key(e, key), cause: nil unless retryable?(e) && attempt < @max_retries
 

@@ -57,9 +57,9 @@ class InsuranceTest < Minitest::Test
     @insurance.issue_policy(ORDER, idempotency_key: KEY)
     @insurance.bind_payment(ORDER, PAYMENT)
     calls = api_calls(@transport)
-    assert_equal ['/api/v1/insurance/orders', "/api/v1/insurance/orders/#{ORDER}/issue-policy", "/api/v1/insurance/orders/#{ORDER}/bind-payment"],
-                 calls.map { |call| call[:uri].path }
-    assert_equal [KEY, KEY, nil], calls.map { |call| call[:headers]['Idempotency-Key'] }
+    assert_equal(['/api/v1/insurance/orders', "/api/v1/insurance/orders/#{ORDER}/issue-policy", "/api/v1/insurance/orders/#{ORDER}/bind-payment"],
+                 calls.map { |call| call[:uri].path })
+    assert_equal([KEY, KEY, nil], calls.map { |call| call[:headers]['Idempotency-Key'] })
     assert_nil calls[1][:body]
   end
 
@@ -97,7 +97,7 @@ class InsuranceTest < Minitest::Test
     assert_equal pdf, insurance.get_policy_receipt('insp_1')
     assert_equal pdf, insurance.get_policy_certificate('insp_1')
     calls = api_calls(transport)
-    assert_equal %w[document receipt certificate].map { |file| "/api/v1/insurance/policies/insp_1/#{file}" }, calls.map { |call| call[:uri].path }
+    assert_equal(%w[document receipt certificate].map { |file| "/api/v1/insurance/policies/insp_1/#{file}" }, calls.map { |call| call[:uri].path })
     assert(calls.all? { |call| call[:headers]['Accept'].start_with?('application/pdf') })
   end
 

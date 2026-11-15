@@ -18,19 +18,19 @@ module Lunixi
     def query!(filters, route)
       return {} if filters.nil?
 
-      PhysicalPosRequest.reject_card_data!(filters, '(query)')
+      PhysicalPosCardData.reject_card_data!(filters, '(query)')
       allowed = PHYSICAL_POS_FILTERS.fetch(route)
       given = PhysicalPosRequest.wire_keys!(filters, allowed, 'physical POS', 'filter')
       allowed.each_with_object({}) do |key, query|
         next unless given.key?(key)
 
         value = given[key]
-        next query[key] = PhysicalPosRequest.money!(value, key) if AMOUNT_FILTERS.include?(key)
+        next query[key] = PhysicalPosValue.money!(value, key) if AMOUNT_FILTERS.include?(key)
         next if value.nil? || value == ''
 
         query[key] = filter_value(key, value)
         free_text = PHYSICAL_POS_FREE_TEXT_FILTERS.include?(key)
-        raise PhysicalPosRequest.card_data_rejected(key) if free_text && PhysicalPosCardData.contains_pan_like_value?(query[key])
+        raise PhysicalPosCardData.card_data_rejected(key) if free_text && PhysicalPosCardNumber.contains_pan_like_value?(query[key])
       end
     end
 
@@ -42,7 +42,7 @@ module Lunixi
         end
 
         value.to_s
-      when 'includeTotal' then PhysicalPosRequest.boolean!(value, key) ? 'true' : 'false'
+      when 'includeTotal' then PhysicalPosValue.boolean!(value, key) ? 'true' : 'false'
       else time_filter(key, value)
       end
     end

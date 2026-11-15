@@ -1,59 +1,13 @@
 # frozen_string_literal: true
 
 require_relative 'test_helper'
+require_relative 'physical_pos_payment_support'
 
-# Physical POS payments: request bodies, the Idempotency-Key rule, 202 / 200, the attempt loop of the
-# payment writes (an uncertain outcome is never lost), card-data refusal and filters. Ids and values
-# are synthetic.
+# Physical POS payment writes: request bodies, the Idempotency-Key rule, 202 / 200, the attempt loop of
+# the payment writes (an uncertain outcome is never lost) and card-data refusal. Reads, filters and
+# end-of-day are in physical_pos_reads_test.rb. Ids and values are synthetic.
 class PhysicalPosPaymentsTest < Minitest::Test
-  PAYMENT_ID = '0192f3a1-0000-7000-8000-000000000001'
-  DEVICE_ID = '5f0c2b1e-1111-4222-8333-444455556666'
-  KEY = 'pos-payment-key-0001'
-  BASE = '/api/v1/physical-pos'
-
-  def setup
-    @answers = []
-    @transport = RecordingTransport.new { |request| next_answer(request) }
-    @pos = client(transport: @transport).physical_pos
-  end
-
-  def next_answer(_request)
-    answer = @answers.empty? ? accepted : @answers.shift
-    raise answer if answer.is_a?(Exception)
-
-    answer
-  end
-
-  def sale(overrides = {})
-    { operation: Lunixi::PhysicalPosPaymentOperation::SALE, target: { deviceId: DEVICE_ID }, amountMinor: '4500', currency: 'TRY',
-      merchantReference: 'ORD-2026-000123' }.merge(overrides)
-  end
-
-  def payment(overrides = {})
-    { 'paymentId' => PAYMENT_ID, 'rootPaymentId' => PAYMENT_ID, 'operation' => 'SALE', 'paymentStatus' => 'NOT_STARTED',
-      'amountMinor' => '4500' }.merge(overrides)
-  end
-
-  def accepted(replayed: false)
-    status = replayed ? 200 : 202
-    response(status, { 'data' => { 'payment' => payment, 'replayed' => replayed }, 'statusCode' => status })
-  end
-
-  def failure(status, code, headers = {}, details = nil)
-    body = { 'code' => code }
-    body['details'] = details if details
-    response(status, body, headers)
-  end
-
-  def gateway_calls
-    @transport.calls.reject { |call| call[:uri].path == '/api/v1/auth/token' }
-  end
-
-  def assert_nothing_sent
-    before = gateway_calls.size
-    yield
-    assert_equal before, gateway_calls.size, 'nothing may be sent'
-  end
+  include PhysicalPosPaymentSupport
 
   # ── create_payment ───────────────────────────────────────────────────────
 
@@ -122,7 +76,7 @@ class PhysicalPosPaymentsTest < Minitest::Test
   def test_local_errors_send_nothing
     assert_nothing_sent do
       assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale(environment: 'LIVE'), idempotency_key: KEY) }
-      assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale.reject { |key, _| key == :target }, idempotency_key: KEY) }
+      assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale.except(:target), idempotency_key: KEY) }
       assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale(target: { terminalId: 't' }), idempotency_key: KEY) }
       assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale(installmentCount: '3'), idempotency_key: KEY) }
       assert_raises(Lunixi::ConfigurationError) { @pos.create_payment(sale(items: []), idempotency_key: KEY) }
@@ -182,7 +136,7 @@ class PhysicalPosPaymentsTest < Minitest::Test
     assert_equal [200, true], [result.status_code, result.replayed]
     calls = gateway_calls
     assert_equal 2, calls.size
-    assert_equal [KEY, KEY], calls.map { |call| call[:headers]['Idempotency-Key'] }
+    assert_equal([KEY, KEY], calls.map { |call| call[:headers]['Idempotency-Key'] })
     assert_equal 1, calls.map { |call| call[:body] }.uniq.size
   end
 
@@ -259,7 +213,7 @@ class PhysicalPosPaymentsTest < Minitest::Test
     assert_equal 202, result.status_code
   end
 
-  def test_cancel_payment_generates_a_key_and_is_200
+  def test_cancel_payment_generates_a_key_and_returns_ok
     @answers << accepted(replayed: true)
     result = @pos.cancel_payment(PAYMENT_ID)
     sent = gateway_calls.last
@@ -269,75 +223,5 @@ class PhysicalPosPaymentsTest < Minitest::Test
     @pos.cancel_payment(PAYMENT_ID, idempotency_key: KEY)
     assert_equal KEY, gateway_calls.last[:headers]['Idempotency-Key']
     assert_nothing_sent { assert_raises(Lunixi::ConfigurationError) { @pos.cancel_payment(PAYMENT_ID, idempotency_key: '') } }
-  end
-
-  # ── Reads ────────────────────────────────────────────────────────────────
-
-  def test_reads_unwrap_and_check_money
-    @answers << response(200, { 'data' => { 'payment' => payment } })
-    assert_equal PAYMENT_ID, @pos.get_payment(PAYMENT_ID)['paymentId']
-    assert_equal "#{BASE}/payments/#{PAYMENT_ID}", gateway_calls.last[:uri].path
-    assert gateway_calls.last[:headers].key?('X-Signature')
-    @answers << response(200, { 'data' => { 'payment' => payment('amountMinor' => 4500) } })
-    assert_raises(Lunixi::ConfigurationError) { @pos.get_payment(PAYMENT_ID) }
-    @answers << response(200, { 'data' => { 'totals' => [{ 'difference' => { 'netMinor' => '-150', 'saleMinor' => '-10' } }] } })
-    assert_equal '-10', @pos.get_sales_summary(dateFrom: '2026-11-01').dig('totals', 0, 'difference', 'saleMinor')
-  end
-
-  def test_lists_return_pages_and_check_filters
-    @answers << response(200, { 'data' => { 'items' => [payment] }, 'pageInfo' => { 'hasMore' => true, 'nextCursor' => 'c_2' } })
-    page = @pos.list_payments(deviceId: DEVICE_ID, limit: 20, createdFrom: Time.utc(2026, 11, 1, 9), merchant_reference: 'ORD-1')
-    assert_equal [1, true, 'c_2', nil], [page.items.size, page.has_more, page.next_cursor, page.total_count]
-    assert_equal({ 'limit' => '20', 'deviceId' => DEVICE_ID, 'createdFrom' => '2026-11-01T09:00:00.000Z', 'merchantReference' => 'ORD-1' },
-                 URI.decode_www_form(gateway_calls.last[:uri].query).to_h)
-    assert_nothing_sent do
-      assert_raises(Lunixi::ConfigurationError) { @pos.list_payments(status: 'APPROVED') }
-      assert_raises(Lunixi::ConfigurationError) { @pos.list_payments(limit: 101) }
-      assert_raises(Lunixi::ConfigurationError) { @pos.list_payments(limit: '20') }
-      assert_raises(Lunixi::ConfigurationError) { @pos.list_transactions(amountFromMinor: 100) }
-      assert_raises(Lunixi::ConfigurationError) { @pos.list_settlement_runs(includeTotal: 'true') }
-      assert_raises(Lunixi::ConfigurationError) { @pos.get_tax_summary(groupBy: 'DAY') }
-    end
-  end
-
-  def test_report_days_and_amount_filters
-    @answers << response(200, { 'data' => {} })
-    @pos.get_sales_summary(dateFrom: Date.new(2026, 11, 1), dateTo: '2026-11-07', groupBy: 'DAY', storeId: '')
-    assert_equal({ 'dateFrom' => '2026-11-01', 'dateTo' => '2026-11-07', 'groupBy' => 'DAY' }, URI.decode_www_form(gateway_calls.last[:uri].query).to_h)
-    @answers << response(200, { 'data' => { 'items' => [] } })
-    @pos.list_transactions(amountFromMinor: '100', amountToMinor: '5000', operation: 'REFUND')
-    assert_equal "#{BASE}/transactions", gateway_calls.last[:uri].path
-    assert_equal({ 'amountFromMinor' => '100', 'amountToMinor' => '5000', 'operation' => 'REFUND' }, URI.decode_www_form(gateway_calls.last[:uri].query).to_h)
-  end
-
-  def test_iterate_payments_walks_every_page
-    @answers << response(200, { 'data' => { 'items' => [payment('paymentId' => 'p1')] }, 'pageInfo' => { 'hasMore' => true, 'nextCursor' => 'c_2' } })
-    @answers << response(200, { 'data' => { 'items' => [payment('paymentId' => 'p2')] }, 'pageInfo' => { 'hasMore' => false } })
-    assert_equal %w[p1 p2], @pos.iterate_payments(limit: 1).map { |entry| entry['paymentId'] }
-    assert_equal ['limit=1', 'limit=1&cursor=c_2'], gateway_calls.map { |call| call[:uri].query }
-  end
-
-  # ── End-of-day ───────────────────────────────────────────────────────────
-
-  def test_start_settlement_is_keyed_and_reports_202_or_200
-    @answers << response(202, { 'data' => { 'run' => { 'runId' => 'run_1', 'runStatus' => 'PENDING' }, 'replayed' => false } })
-    result = @pos.start_settlement(DEVICE_ID)
-    sent = gateway_calls.last
-    assert_equal ['POST', "#{BASE}/devices/#{DEVICE_ID}/settlement", '{}'], [sent[:method], sent[:uri].path, sent[:body]]
-    assert_equal [sent[:headers]['Idempotency-Key'], 202, 'run_1'], [result.idempotency_key, result.status_code, result['run']['runId']]
-    @answers << response(200, { 'data' => { 'run' => { 'runId' => 'run_1' }, 'replayed' => true } })
-    replay = @pos.start_settlement(DEVICE_ID, idempotency_key: KEY)
-    assert_equal [200, true], [replay.status_code, replay.replayed]
-    assert_equal KEY, gateway_calls.last[:headers]['Idempotency-Key']
-  end
-
-  def test_settlement_reads
-    @answers << response(200, { 'data' => { 'run' => { 'runId' => 'run_1' } } })
-    assert_equal 'run_1', @pos.get_settlement_run('run_1')['runId']
-    @answers << response(200, { 'data' => { 'items' => [{ 'lines' => [{ 'reported' => { 'saleMinor' => '100' } }] }] }, 'pageInfo' => { 'totalCount' => 1 } })
-    assert_equal 1, @pos.list_settlements(deviceId: DEVICE_ID, lineStatus: 'MATCHED').items.size
-    @answers << response(200, { 'data' => { 'items' => [] }, 'pageInfo' => { 'totalCount' => 4, 'hasMore' => false } })
-    assert_equal 4, @pos.list_settlement_runs(includeTotal: true, source: 'SCHEDULED').total_count
-    assert_equal 'includeTotal=true&source=SCHEDULED', gateway_calls.last[:uri].query
   end
 end

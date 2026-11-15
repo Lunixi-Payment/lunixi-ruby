@@ -59,9 +59,9 @@ module Lunixi
     CODE = 'physical_pos.payment.card_data_rejected'
     attr_reader :field
 
-    def initialize(field: nil, **options)
+    def initialize(field: nil, **)
       @field = field
-      super(**{ code: CODE }.merge(options))
+      super(code: CODE, **)
     end
   end
 
@@ -79,9 +79,9 @@ module Lunixi
   class PhysicalPosOutcomeUnknownError < ApiError
     attr_reader :attempts
 
-    def initialize(attempts: nil, **options)
+    def initialize(attempts: nil, **)
       @attempts = attempts
-      super(**options)
+      super(**)
     end
   end
 
@@ -92,9 +92,9 @@ module Lunixi
     CODE = 'physical_pos.payment.void_after_settlement'
     attr_reader :allowed_operation
 
-    def initialize(allowed_operation: nil, **options)
+    def initialize(allowed_operation: nil, **)
       @allowed_operation = allowed_operation
-      super(**{ code: CODE }.merge(options))
+      super(code: CODE, **)
     end
   end
 end

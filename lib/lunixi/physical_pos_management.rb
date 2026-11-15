@@ -304,7 +304,7 @@ module Lunixi
     end
 
     def id(value, field)
-      PhysicalPosRequest.path_id(value, field)
+      PhysicalPosIdentifiers.path_id(value, field)
     end
 
     def store_path(store_id)

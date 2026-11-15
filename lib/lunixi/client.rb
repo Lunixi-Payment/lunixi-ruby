@@ -91,7 +91,7 @@ module Lunixi
     # given); wallet routes 1–128 characters without control characters; subscription, KYC, identity and
     # marketplace routes any non-empty key without control characters (sent trimmed).
     def request_idempotency_key(path, key)
-      return PhysicalPosRequest.idempotency_key!(key) if path.match?(PhysicalPosRequest::ROUTE)
+      return PhysicalPosIdentifiers.idempotency_key!(key) if path.match?(PhysicalPosRequest::ROUTE)
       return RouteRequest.printable_idempotency_key!(key) if path.match?(RouteRequest::PRINTABLE_KEY_ROUTE)
       return WalletInvoker.idempotency_key!(key) if path.match?(WalletInvoker::ROUTE)
       return RouteTable.idempotency_key!(key) if path.match?(RouteTable::KEY_ROUTE)

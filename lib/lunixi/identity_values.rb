@@ -10,7 +10,7 @@ module Lunixi
 
   identity_live = '/api/v1/identity/live-sessions'
   route = lambda do |method, path, **extra|
-    RouteRequest.route(method, path, **{ step_up: false, idempotency_key: 'none' }.merge(extra))
+    RouteRequest.route(method, path, step_up: false, idempotency_key: 'none', **extra)
   end
 
   # Every identity route the SDK calls (access token only). The same table as the Node SDK's

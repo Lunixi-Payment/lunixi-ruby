@@ -2,8 +2,8 @@
 
 module Lunixi
   # The gateway's card-data rules for physical POS requests: card-data field names (any depth of a body
-  # or filter set) and card numbers written into free-text values. The card is read on the device; a
-  # request never carries card data.
+  # or filter set) and the refusal of card data, field names and card numbers in free text (read by
+  # PhysicalPosCardNumber). The card is read on the device; a request never carries card data.
   module PhysicalPosCardData
     NUMBER_TERMS = %w[pan pannumber cardpan cardnumber cardno cardnum cardnr ccnumber ccnum primaryaccountnumber].freeze
     SECRET_TERMS = %w[
@@ -28,15 +28,10 @@ module Lunixi
     DIGIT_RUN_KEY_SOURCE = '[0-9](?:[ -]?[0-9]){12,}'
     DIGIT_RUN_KEY = Regexp.new(DIGIT_RUN_KEY_SOURCE)
     IDENTIFIER_KEY = /\A[A-Za-z_$][A-Za-z0-9_$]*\z/
-    PAN_CANDIDATE = /(?<![\p{L}\p{N}])(?<![\p{L}\p{N}]-)[0-9](?:[ -]?[0-9]){12,18}(?![\p{L}\p{N}])(?!-[\p{L}\p{N}])/
-    GTIN = /\A(?:[0-9]{8}|[0-9]{12,14})\z/
-
-    # contains_pan_like_value? modes: STRICT for every scanned field, ITEM_TEXT for item names (an
-    # unseparated 13 or 14 digit number with a valid GTIN check digit is a barcode, not a card).
-    STRICT = 'STRICT'
-    ITEM_TEXT = 'ITEM_TEXT'
 
     CARD_DATA_TERMS = (NUMBER_TERMS + SECRET_TERMS).freeze
+    CARD_DATA_MESSAGE = 'Physical POS requests must not contain card data: the card is read on the device. Remove the field ' \
+                        'or value; do not send card numbers, expiry dates or security codes.'
 
     module_function
 
@@ -63,7 +58,7 @@ module Lunixi
 
     def card_data_run?(tokens, start, masked)
       joined = +''
-      tokens[start..-1].any? do |token|
+      tokens[start..].any? do |token|
         joined << token
         next true if CARD_DATA_TERMS.include?(joined) && !(masked && NUMBER_TERMS.include?(joined))
 
@@ -100,52 +95,23 @@ module Lunixi
       path.empty? ? name : "#{path}.#{name}"
     end
 
-    # True when the text holds a stand-alone, Luhn-valid 13–19 digit number (plain, space or dash
-    # separated). In ITEM_TEXT mode a valid unseparated 13 or 14 digit GTIN is a barcode.
-    def contains_pan_like_value?(text, mode = STRICT)
-      return false unless text.is_a?(String)
-
-      utf8_text(text).scan(PAN_CANDIDATE).any? do |candidate|
-        digits = candidate.delete(' -')
-        next false unless digits.length.between?(13, 19)
-        next false if mode == ITEM_TEXT && digits == candidate && digits.length <= 14 && gtin_valid?(digits)
-
-        luhn_valid?(digits)
-      end
+    def card_data_rejected(field)
+      PhysicalPosCardDataRejectedError.new(status: 0, field: field, message: "#{CARD_DATA_MESSAGE} Field: #{field}.")
     end
 
-    def utf8_text(text)
-      utf8 = text.encode(Encoding::UTF_8)
-      raise ConfigurationError, 'Physical POS request text must be valid UTF-8' unless utf8.valid_encoding?
-
-      utf8
-    rescue EncodingError
-      raise ConfigurationError, 'Physical POS request text must be valid UTF-8', cause: nil
+    def reject_card_data!(value, root)
+      field = find_card_data_field(value, root)
+      raise card_data_rejected(field) unless field.nil?
     end
 
-    def luhn_valid?(digits)
-      sum = 0
-      digits.reverse.each_char.with_index do |char, index|
-        digit = char.to_i
-        if index.odd?
-          digit *= 2
-          digit -= 9 if digit > 9
-        end
-        sum += digit
-      end
-      (sum % 10).zero?
-    end
+    # Card-number values in the free-text fields the gateway scans (the value never reaches the error).
+    def reject_card_numbers!(body)
+      raise card_data_rejected('merchantReference') if PhysicalPosCardNumber.contains_pan_like_value?(body['merchantReference'])
 
-    def gtin_valid?(digits)
-      return false unless digits.match?(GTIN)
-
-      sum = 0
-      weight = 3
-      (digits.length - 2).downto(0) do |index|
-        sum += digits[index].to_i * weight
-        weight = weight == 3 ? 1 : 3
+      Array(body['items']).each_with_index do |item, index|
+        raise card_data_rejected("items[#{index}].name") if PhysicalPosCardNumber.contains_pan_like_value?(item['name'], PhysicalPosCardNumber::ITEM_TEXT)
+        raise card_data_rejected("items[#{index}].taxGroupCode") if PhysicalPosCardNumber.contains_pan_like_value?(item['taxGroupCode'])
       end
-      (10 - (sum % 10)) % 10 == digits[-1].to_i
     end
   end
 end

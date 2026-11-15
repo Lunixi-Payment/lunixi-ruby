@@ -56,7 +56,7 @@ class FraudTest < Minitest::Test
     assert_equal ['POST', '/api/v1/fraud/events/transactions/batch'], [sent[:method], sent[:uri].path]
     body = JSON.parse(sent[:body])
     assert_kind_of Array, body
-    assert_equal %w[evt_1 evt_2], body.map { |entry| entry['eventId'] }
+    assert_equal(%w[evt_1 evt_2], body.map { |entry| entry['eventId'] })
     assert_equal idempotency_key, sent[:headers]['Idempotency-Key']
     assert sent[:headers].key?('X-Signature')
   end

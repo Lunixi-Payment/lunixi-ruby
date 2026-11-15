@@ -83,7 +83,7 @@ class PaymentValuesTest < Minitest::Test
     requests = @transport.calls.drop(1)
     assert_equal(%w[/api/v1/reference/tr-address/provinces /api/v1/reference/tr-address/districts /api/v1/reference/tr-address/neighborhoods],
                  requests.map { |request| request[:uri].path })
-    assert_equal [nil, 'provinceCode=06', 'districtCode=1234'], requests.map { |request| request[:uri].query }
+    assert_equal([nil, 'provinceCode=06', 'districtCode=1234'], requests.map { |request| request[:uri].query })
   end
 
   def test_bank_transfer_instruction_reads_display_action_only

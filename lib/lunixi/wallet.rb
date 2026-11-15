@@ -61,7 +61,7 @@ module Lunixi
     def self.idempotency_key!(key, operation = nil)
       value = key.is_a?(String) ? key.strip : ''
       if value.empty?
-        raise ConfigurationError, "A stable Idempotency-Key is required#{operation ? " for #{operation}" : ''}. Reuse the same key when " \
+        raise ConfigurationError, "A stable Idempotency-Key is required#{" for #{operation}" if operation}. Reuse the same key when " \
                                   'retrying the same operation.'
       end
       if value.length > WALLET_IDEMPOTENCY_KEY_MAX || value.match?(CONTROL_CHARACTERS)
@@ -92,15 +92,15 @@ module Lunixi
       key = key_for(name, route, idempotency_key)
       binary = route['binary'] == true
       @client.request(route['method'], path, body: payload, query: filters, idempotency_key: key, binary: binary,
-                      accept: binary ? QR_IMAGE_ACCEPT : Client::ACCEPT_JSON)
+                                             accept: binary ? QR_IMAGE_ACCEPT : Client::ACCEPT_JSON)
     end
 
-    def data(name, **options)
-      RouteRequest.unwrap(call(name, **options))
+    def data(name, **)
+      RouteResponse.unwrap(call(name, **))
     end
 
-    def page(name, **options)
-      RouteRequest.page(call(name, **options))
+    def page(name, **)
+      RouteResponse.page(call(name, **))
     end
 
     # The complete routes require operationId in the body as well; the path wins on the server.

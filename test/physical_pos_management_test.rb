@@ -40,7 +40,7 @@ class PhysicalPosManagementTest < Minitest::Test
     assert last_call[:headers].key?('X-Signature'), "#{method} #{path} must be signed"
   end
 
-  def test_create_store_is_keyed_and_201_or_200
+  def test_create_store_is_keyed_and_returns_created_or_ok
     @answers << response(201, { 'data' => { 'store' => { 'storeId' => STORE_ID, 'rowVersion' => 1 } } })
     result = @manage.create_store({ code: 'IST-01', name: 'Kadikoy', city: '', timezone: 'Europe/Istanbul' })
     assert_route 'POST', '/stores'
@@ -187,7 +187,7 @@ class PhysicalPosManagementTest < Minitest::Test
     seen = []
     @manage.iterate_registers(STORE_ID, status: 'ACTIVE') { |register| seen << register['id'] }
     assert_equal %w[r1 r2], seen
-    assert_equal ['status=ACTIVE', 'cursor=c_2&status=ACTIVE'], gateway_calls.map { |call| call[:uri].query }
+    assert_equal(['status=ACTIVE', 'cursor=c_2&status=ACTIVE'], gateway_calls.map { |call| call[:uri].query })
   end
 
   def test_settlement_policies

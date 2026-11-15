@@ -34,7 +34,7 @@ class PhysicalPosParityTest < Minitest::Test
 
   def test_pan_value_cases
     FIXTURE.fetch('panValueCases').each do |entry|
-      actual = Lunixi::PhysicalPosCardData.contains_pan_like_value?(entry['value'], entry['mode'])
+      actual = Lunixi::PhysicalPosCardNumber.contains_pan_like_value?(entry['value'], entry['mode'])
       assert_equal entry['pan'], actual, "#{entry['mode']}: #{entry['value']}"
     end
   end
@@ -42,9 +42,9 @@ class PhysicalPosParityTest < Minitest::Test
   def test_idempotency_key_cases
     FIXTURE.fetch('idempotencyKeyCases').each do |entry|
       if entry['valid']
-        assert_equal entry['key'], Lunixi::PhysicalPosRequest.idempotency_key!(entry['key'])
+        assert_equal entry['key'], Lunixi::PhysicalPosIdentifiers.idempotency_key!(entry['key'])
       else
-        assert_raises(Lunixi::ConfigurationError, entry['key'].inspect) { Lunixi::PhysicalPosRequest.idempotency_key!(entry['key']) }
+        assert_raises(Lunixi::ConfigurationError, entry['key'].inspect) { Lunixi::PhysicalPosIdentifiers.idempotency_key!(entry['key']) }
       end
     end
   end
@@ -122,9 +122,9 @@ class PhysicalPosParityTest < Minitest::Test
   def test_path_id_cases
     FIXTURE.fetch('pathIdCases').each do |entry|
       if entry['valid']
-        assert_equal entry.fetch('encoded', entry['id']), Lunixi::PhysicalPosRequest.path_id(entry['id'], 'paymentId')
+        assert_equal entry.fetch('encoded', entry['id']), Lunixi::PhysicalPosIdentifiers.path_id(entry['id'], 'paymentId')
       else
-        assert_raises(Lunixi::ConfigurationError, entry['id'].inspect) { Lunixi::PhysicalPosRequest.path_id(entry['id'], 'paymentId') }
+        assert_raises(Lunixi::ConfigurationError, entry['id'].inspect) { Lunixi::PhysicalPosIdentifiers.path_id(entry['id'], 'paymentId') }
       end
     end
   end

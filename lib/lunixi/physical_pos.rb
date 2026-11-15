@@ -36,7 +36,7 @@ module Lunixi
 
     # A new Idempotency-Key (UUID v4). Store it with your order before you call.
     def self.new_idempotency_key
-      PhysicalPosRequest.new_idempotency_key
+      PhysicalPosIdentifiers.new_idempotency_key
     end
 
     # Verifies (signature, event id, timestamp) and reads a physical_pos.* webhook from the raw body,
@@ -62,7 +62,7 @@ module Lunixi
     # for a new payment, 200 with replayed true when the same key and body were sent before (the
     # payment's current view). Raises PhysicalPosOutcomeUnknownError when the outcome is unknown.
     def create_payment(request, idempotency_key: nil)
-      key = PhysicalPosRequest.required_idempotency_key!(idempotency_key, 'a physical POS payment')
+      key = PhysicalPosIdentifiers.required_idempotency_key!(idempotency_key, 'a physical POS payment')
       body = PhysicalPosRequest.body!(request, PHYSICAL_POS_REQUEST_FIELDS['createPayment'], 'createPayment request')
       @gateway.payment_write('/payments', body, key, NEW_PAYMENT)
     end
@@ -72,8 +72,8 @@ module Lunixi
     # child payment (originalPaymentId = payment_id) followed like any payment. idempotency_key is
     # required; same result and errors as create_payment.
     def create_reversal(payment_id, request, idempotency_key: nil)
-      path = "/payments/#{PhysicalPosRequest.path_id(payment_id, 'paymentId')}/reversals"
-      key = PhysicalPosRequest.required_idempotency_key!(idempotency_key, 'a physical POS reversal')
+      path = "/payments/#{PhysicalPosIdentifiers.path_id(payment_id, 'paymentId')}/reversals"
+      key = PhysicalPosIdentifiers.required_idempotency_key!(idempotency_key, 'a physical POS reversal')
       body = PhysicalPosRequest.body!(request, PHYSICAL_POS_REQUEST_FIELDS['createReversal'], 'createReversal request')
       @gateway.payment_write(path, body, key, NEW_PAYMENT)
     end
@@ -84,13 +84,13 @@ module Lunixi
     # comes back unchanged with replayed true. To undo an approved sale use a reversal. Cancelling is
     # idempotent, so the key is optional (a new UUID when nil).
     def cancel_payment(payment_id, idempotency_key: nil)
-      path = "/payments/#{PhysicalPosRequest.path_id(payment_id, 'paymentId')}/cancel"
-      @gateway.payment_write(path, {}, PhysicalPosRequest.idempotency_key_or_new(idempotency_key), OK)
+      path = "/payments/#{PhysicalPosIdentifiers.path_id(payment_id, 'paymentId')}/cancel"
+      @gateway.payment_write(path, {}, PhysicalPosIdentifiers.idempotency_key_or_new(idempotency_key), OK)
     end
 
     # One payment with its items and refund items (GET /payments/{paymentId}).
     def get_payment(payment_id)
-      @gateway.record('GET', "/payments/#{PhysicalPosRequest.path_id(payment_id, 'paymentId')}", 'payment')
+      @gateway.record('GET', "/payments/#{PhysicalPosIdentifiers.path_id(payment_id, 'paymentId')}", 'payment')
     end
 
     # Payments, newest first (GET /payments). Roots and reversals are in one list; items and
@@ -115,7 +115,7 @@ module Lunixi
 
     # The tree of a root or child payment with its timeline (GET /transactions/{paymentId}).
     def get_transaction(payment_id)
-      @gateway.record('GET', "/transactions/#{PhysicalPosRequest.path_id(payment_id, 'paymentId')}", 'transaction')
+      @gateway.record('GET', "/transactions/#{PhysicalPosIdentifiers.path_id(payment_id, 'paymentId')}", 'transaction')
     end
 
     # Payments with an unknown outcome or under manual review (GET /transactions/ambiguous).
@@ -156,7 +156,7 @@ module Lunixi
     # or nil for a new UUID (returned as idempotency_key; after an unknown outcome call again with it).
     # A TEST key is refused with 403 physical_pos.environment.test_key_read_only.
     def start_settlement(device_id, idempotency_key: nil)
-      path = "/devices/#{PhysicalPosRequest.path_id(device_id, 'deviceId')}/settlement"
+      path = "/devices/#{PhysicalPosIdentifiers.path_id(device_id, 'deviceId')}/settlement"
       @gateway.keyed_write(path, {}, idempotency_key, NEW_PAYMENT)
     end
 
@@ -173,7 +173,7 @@ module Lunixi
 
     # One end-of-day run with its command status and result state (GET /settlement-runs/{runId}).
     def get_settlement_run(run_id)
-      @gateway.record('GET', "/settlement-runs/#{PhysicalPosRequest.path_id(run_id, 'runId')}", 'run')
+      @gateway.record('GET', "/settlement-runs/#{PhysicalPosIdentifiers.path_id(run_id, 'runId')}", 'run')
     end
 
     def inspect

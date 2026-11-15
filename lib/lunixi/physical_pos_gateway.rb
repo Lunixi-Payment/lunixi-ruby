@@ -45,7 +45,7 @@ module Lunixi
 
     # A management or end-of-day write with an Idempotency-Key: the caller's key, or a new UUID for nil.
     def keyed_write(path, body, idempotency_key, fallback)
-      key = PhysicalPosRequest.idempotency_key_or_new(idempotency_key)
+      key = PhysicalPosIdentifiers.idempotency_key_or_new(idempotency_key)
       PhysicalPosResponses.write_result(perform('POST', path, body: body, idempotency_key: key), key, fallback)
     end
 
@@ -92,12 +92,13 @@ module Lunixi
       [response, nil, nil]
     rescue ApiError => e
       [nil, e, attempt_outcome(e)]
-    rescue TransportError, RedirectError => e
-      [nil, e, AMBIGUOUS]
-    rescue Error => e
-      [nil, e, nil]
     rescue StandardError => e
-      [nil, e, AMBIGUOUS]
+      [nil, e, raised_before_sending?(e) ? nil : AMBIGUOUS]
+    end
+
+    # An SDK error other than a transport or redirect failure (a local check) means nothing was sent.
+    def raised_before_sending?(error)
+      error.is_a?(Error) && !error.is_a?(TransportError) && !error.is_a?(RedirectError)
     end
 
     # - ambiguous: no HTTP answer, an unreadable 2xx, or a 5xx that does not say "not started".

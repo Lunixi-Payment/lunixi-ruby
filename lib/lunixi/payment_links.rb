@@ -33,7 +33,7 @@ module Lunixi
     # createdTo (a Time or ISO 8601 string) bound a half-open window; query matches a short code or a
     # title/reference prefix.
     def list(**filters)
-      client.request('GET', BASE, query: PaymentLinkRules.list_query!(filters, PaymentLinkRules::LINK_LIST_FILTERS, 'payment_links.list'))
+      client.request('GET', BASE, query: PaymentLinkFilters.list_query!(filters, PaymentLinkFilters::LINK_LIST_FILTERS, 'payment_links.list'))
     end
 
     def get(link_id)
@@ -83,13 +83,13 @@ module Lunixi
 
     # Payment attempts on the link, newest first; state takes an Array.
     def list_attempts(link_id, **filters)
-      query = PaymentLinkRules.list_query!(filters, PaymentLinkRules::ATTEMPT_LIST_FILTERS, 'payment_links.list_attempts')
+      query = PaymentLinkFilters.list_query!(filters, PaymentLinkFilters::ATTEMPT_LIST_FILTERS, 'payment_links.list_attempts')
       client.request('GET', "#{link_path(link_id)}/attempts", query: query)
     end
 
     # Successful payments on the link, with refund totals.
     def list_payments(link_id, **filters)
-      query = PaymentLinkRules.list_query!(filters, PaymentLinkRules::PAYMENT_LIST_FILTERS, 'payment_links.list_payments')
+      query = PaymentLinkFilters.list_query!(filters, PaymentLinkFilters::PAYMENT_LIST_FILTERS, 'payment_links.list_payments')
       client.request('GET', "#{link_path(link_id)}/payments", query: query)
     end
 
@@ -98,9 +98,9 @@ module Lunixi
     # uploadUrl with exactly uploadHeaders before expiresAt; step 3 is confirm_image_upload(assetId).
     # A declared size over the image limit (2 MiB) is refused by the gateway before anything is uploaded.
     def create_image_upload(file_name: nil, content_type: nil, size_bytes: nil)
-      body = PaymentLinkRules.image_body!(file_name, content_type, size_bytes)
+      body = PaymentLinkImageRules.image_body!(file_name, content_type, size_bytes)
       envelope = client.request('POST', IMAGES, body: body)
-      PaymentLinkRules.upload_target!(envelope)
+      PaymentLinkImageRules.upload_target!(envelope)
       envelope
     end
 
@@ -108,8 +108,8 @@ module Lunixi
     # use assetId as the imageAssetId of a link or an item. Confirming before the PUT has landed is
     # 400 media.confirm.object_missing and can be retried.
     def confirm_image_upload(asset_id)
-      envelope = client.request('POST', "#{IMAGES}/#{PaymentLinkRules.asset_id!(asset_id)}/confirm", body: {})
-      PaymentLinkRules.published_image!(envelope)
+      envelope = client.request('POST', "#{IMAGES}/#{PaymentLinkImageRules.asset_id!(asset_id)}/confirm", body: {})
+      PaymentLinkImageRules.published_image!(envelope)
       envelope
     end
 
@@ -117,8 +117,8 @@ module Lunixi
     # confirm_image_upload. A failed PUT is not retried; it raises ApiError with the storage status (and
     # its error code, e.g. AccessDenied once the URL has expired). Call upload_image again for a new URL.
     def upload_image(file_name: nil, content_type: nil, content: nil)
-      bytes = PaymentLinkRules.image_content!(content)
-      target = PaymentLinkRules.upload_target!(create_image_upload(file_name: file_name, content_type: content_type, size_bytes: bytes.bytesize))
+      bytes = PaymentLinkImageRules.image_content!(content)
+      target = PaymentLinkImageRules.upload_target!(create_image_upload(file_name: file_name, content_type: content_type, size_bytes: bytes.bytesize))
       put_to_storage(target, bytes)
       confirm_image_upload(target['assetId'])
     end
@@ -136,7 +136,7 @@ module Lunixi
       raise TransportError, 'Image upload to storage returned an invalid response' unless response.is_a?(Response) && response.status.is_a?(Integer)
       return if response.status.between?(200, 299)
 
-      raise ApiError.new(status: response.status, code: PaymentLinkRules.storage_error_code(response.body))
+      raise ApiError.new(status: response.status, code: PaymentLinkImageRules.storage_error_code(response.body))
     rescue TransportError
       raise TransportError, 'Image upload to storage failed; call upload_image again for a new upload URL', cause: nil
     end

@@ -66,7 +66,7 @@ module Lunixi
       body = RouteRequest.wire_hash!(request, 'create request')
       key = RouteTable.idempotency_key_of('create', body, idempotency_key)
       body['idempotencyKey'] = key.strip if key.is_a?(String) && !key.strip.empty?
-      RouteRequest.one_of!(body['collectionMethod'], SubscriptionCollectionMethod::ALL, 'collectionMethod') if body.key?('collectionMethod')
+      RouteValue.one_of!(body['collectionMethod'], SubscriptionCollectionMethod::ALL, 'collectionMethod') if body.key?('collectionMethod')
       SubscriptionRules.boolean!(body, 'chargeOnCreate')
       SubscriptionRules.boolean!(body, 'skipTrial')
       raise ConfigurationError, "'metadata' must be a Hash." if body.key?('metadata') && !body['metadata'].is_a?(Hash)
@@ -84,20 +84,20 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block, :pageToken) { |query| list(**query) }
+      RouteResponse.each_item(filters, block, :pageToken) { |query| list(**query) }
     end
 
     # Cancels now, or at the period end with at_period_end: true.
     def cancel(subscription_id, at_period_end: false, reason: nil)
       raise ConfigurationError, "'at_period_end' must be true or false." unless [true, false].include?(at_period_end)
 
-      body = RouteRequest.compact('cancelAtPeriodEnd' => at_period_end, 'reason' => RouteRequest.optional_text(reason, 'reason'))
+      body = RouteRequest.compact('cancelAtPeriodEnd' => at_period_end, 'reason' => RouteValue.optional_text(reason, 'reason'))
       @routes.data('cancel', params: { 'subscriptionId' => subscription_id }, body: body)
     end
 
     # Pauses billing; resume_at (ISO 8601) resumes it automatically.
     def pause(subscription_id, resume_at: nil)
-      body = RouteRequest.compact('resumeAt' => RouteRequest.optional_text(resume_at, 'resumeAt'))
+      body = RouteRequest.compact('resumeAt' => RouteValue.optional_text(resume_at, 'resumeAt'))
       @routes.data('pause', params: { 'subscriptionId' => subscription_id }, body: body)
     end
 
@@ -111,9 +111,7 @@ module Lunixi
       body = RouteRequest.wire_hash!(request, 'changePlan request')
       key = RouteTable.idempotency_key_of('changePlan', body, idempotency_key)
       body['idempotencyKey'] = key.strip if key.is_a?(String) && !key.strip.empty?
-      if body.key?('behavior')
-        body['behavior'] = RouteRequest.one_of!(body['behavior'].to_s.upcase, SubscriptionPlanChangeBehavior::ALL, 'behavior')
-      end
+      body['behavior'] = RouteValue.one_of!(body['behavior'].to_s.upcase, SubscriptionPlanChangeBehavior::ALL, 'behavior') if body.key?('behavior')
       @routes.data('changePlan', params: { 'subscriptionId' => subscription_id }, body: body, idempotency_key: key)
     end
 
@@ -143,7 +141,7 @@ module Lunixi
 
     def integers!(values, field, min, max = nil)
       valid = values.is_a?(Array) && values.all? { |value| value.is_a?(Integer) && value >= min && (max.nil? || value <= max) }
-      raise ConfigurationError, "'#{field}' must be an array of integers from #{min}#{max ? " to #{max}" : ''}." unless valid
+      raise ConfigurationError, "'#{field}' must be an array of integers from #{min}#{" to #{max}" if max}." unless valid
 
       values.dup
     end
@@ -160,7 +158,7 @@ module Lunixi
     # a supported currency, the billing rule and the dunning counts.
     def plan!(request)
       body = RouteRequest.wire_hash!(request, 'plans.create request')
-      %w[productId code name].each { |field| body[field] = RouteRequest.text!(body[field], field) if body.key?(field) }
+      %w[productId code name].each { |field| body[field] = RouteValue.text!(body[field], field) if body.key?(field) }
       raise ConfigurationError, 'plans.create requires price.' unless body.key?('price')
 
       body['currency'] = currency!(body['currency']) if body.key?('currency')
@@ -173,12 +171,12 @@ module Lunixi
     # { frequency, interval? (default 1), byMonthDay?, byWeekDay?, timezone?, lastDayOfMonthFix?, count? }.
     def billing_rule!(value)
       rule = RouteRequest.wire_keys!(value, SUBSCRIPTION_BILLING_RULE_FIELDS, 'billing')
-      rule['frequency'] = RouteRequest.one_of!(rule['frequency'].to_s.upcase, SubscriptionBillingFrequency::ALL, 'billing.frequency')
+      rule['frequency'] = RouteValue.one_of!(rule['frequency'].to_s.upcase, SubscriptionBillingFrequency::ALL, 'billing.frequency')
       rule['interval'] = 1 unless rule.key?('interval')
       count!(rule, 'interval', 1, 'billing.interval')
       count!(rule, 'count', 0, 'billing.count')
       rule['byMonthDay'] = integers!(rule['byMonthDay'], 'billing.byMonthDay', 1, 31) if rule.key?('byMonthDay')
-      if rule.key?('byWeekDay') && !(rule['byWeekDay'].is_a?(Array) && rule['byWeekDay'].all? { |day| day.is_a?(String) })
+      if rule.key?('byWeekDay') && !(rule['byWeekDay'].is_a?(Array) && rule['byWeekDay'].all?(String))
         raise ConfigurationError, "'billing.byWeekDay' must be an array of week days (MO, TU, WE, TH, FR, SA, SU)."
       end
 
@@ -189,7 +187,7 @@ module Lunixi
     # The saved-card body: a paymentMethodToken, never a card number (an unknown field is refused by name).
     def card!(request)
       body = RouteRequest.wire_hash!(request, 'cards.add request')
-      RouteRequest.one_of!(body['verificationMode'], SubscriptionCardVerificationMode::ALL, 'verificationMode') if body.key?('verificationMode')
+      RouteValue.one_of!(body['verificationMode'], SubscriptionCardVerificationMode::ALL, 'verificationMode') if body.key?('verificationMode')
       count!(body, 'expireMonth', 1)
       count!(body, 'expireYear', 1)
       boolean!(body, 'isDefault')

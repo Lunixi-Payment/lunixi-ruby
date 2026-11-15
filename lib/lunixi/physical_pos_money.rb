@@ -19,9 +19,9 @@ module Lunixi
 
     module_function
 
-    def validate(value, difference = false)
+    def validate(value, difference: false)
       case value
-      when Array then value.each { |entry| validate(entry, difference) }
+      when Array then value.each { |entry| validate(entry, difference: difference) }
       when Hash
         value.each do |name, entry|
           key = name.to_s
@@ -30,7 +30,7 @@ module Lunixi
 
             amount!(entry, key, difference || key.start_with?('net'))
           elsif CONTAINERS.include?(key)
-            validate(entry, difference || key == 'difference')
+            validate(entry, difference: difference || key == 'difference')
           end
         end
       end

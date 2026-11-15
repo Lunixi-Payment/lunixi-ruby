@@ -65,7 +65,7 @@ module Lunixi
     def expected_row_version_query(expected_row_version)
       return {} if expected_row_version.nil?
 
-      { 'expectedRowVersion' => PhysicalPosRequest.row_version!(expected_row_version, 'expectedRowVersion').to_s }
+      { 'expectedRowVersion' => PhysicalPosIdentifiers.row_version!(expected_row_version, 'expectedRowVersion').to_s }
     end
   end
 end

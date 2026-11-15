@@ -126,7 +126,7 @@ module Lunixi
   portal_panel = '/api/panel/v1/subscriptions/portal'
   cursor_query = %w[pageSize pageToken].freeze
   route = lambda do |method, path, **extra|
-    RouteRequest.route(method, path, **{ step_up: false, idempotency_key: 'none' }.merge(extra))
+    RouteRequest.route(method, path, step_up: false, idempotency_key: 'none', **extra)
   end
 
   # Every subscription route the SDK calls: method, path, whether it is signed (never: the subscription
@@ -134,22 +134,22 @@ module Lunixi
   # the operation names ("plans.create"). The same table as the Node SDK's SUBSCRIPTION_ROUTES; the
   # parity test compares it with the shared catalog.
   SUBSCRIPTION_ROUTES = {
-    'create' => route.call('POST', "#{subscriptions_base}/subscriptions", idempotency_key: 'required',
-      required: %w[customerId planId idempotencyKey],
-      optional: %w[paymentCardId paymentMethodId collectionMethod priceUpdatePolicy entitlementPolicy billingTimezone startsAt chargeOnCreate
-                   billingCycleAnchorOverride skipTrial metadata]),
+    'create' => route.call('POST', "#{subscriptions_base}/subscriptions",
+                           idempotency_key: 'required', required: %w[customerId planId idempotencyKey],
+                           optional: %w[paymentCardId paymentMethodId collectionMethod priceUpdatePolicy entitlementPolicy billingTimezone startsAt
+                                        chargeOnCreate billingCycleAnchorOverride skipTrial metadata]),
     'get' => route.call('GET', "#{subscriptions_base}/subscriptions/:subscriptionId"),
     'list' => route.call('GET', "#{subscriptions_base}/subscriptions", query: %w[customerId status] + cursor_query),
     'cancel' => route.call('POST', "#{subscriptions_base}/subscriptions/:subscriptionId/cancel", required: %w[cancelAtPeriodEnd], optional: %w[reason]),
     'pause' => route.call('POST', "#{subscriptions_base}/subscriptions/:subscriptionId/pause", optional: %w[resumeAt], optional_body: true),
     'resume' => route.call('POST', "#{subscriptions_base}/subscriptions/:subscriptionId/resume"),
-    'changePlan' => route.call('POST', "#{subscriptions_base}/subscriptions/:subscriptionId/change-plan", idempotency_key: 'optional',
-      required: %w[newPlanId], optional: %w[behavior reason idempotencyKey]),
+    'changePlan' => route.call('POST', "#{subscriptions_base}/subscriptions/:subscriptionId/change-plan",
+                               idempotency_key: 'optional', required: %w[newPlanId], optional: %w[behavior reason idempotencyKey]),
     'auditLogs' => route.call('GET', "#{subscriptions_base}/subscriptions/:subscriptionId/audit-logs", query: %w[limit pageToken]),
 
-    'plans.create' => route.call('POST', "#{subscriptions_base}/plans", idempotency_key: 'optional',
-      required: %w[productId code name price currency billing],
-      optional: %w[description trialPeriodDays maxDunningAttempts dunningScheduleDays gracePeriodDays metadata]),
+    'plans.create' => route.call('POST', "#{subscriptions_base}/plans",
+                                 idempotency_key: 'optional', required: %w[productId code name price currency billing],
+                                 optional: %w[description trialPeriodDays maxDunningAttempts dunningScheduleDays gracePeriodDays metadata]),
     'plans.get' => route.call('GET', "#{subscriptions_base}/plans/:planId"),
     'plans.list' => route.call('GET', "#{subscriptions_base}/plans", query: %w[productId includeArchived] + cursor_query),
     'plans.update' => route.call('PATCH', "#{subscriptions_base}/plans/:planId", free: true),
@@ -157,8 +157,8 @@ module Lunixi
     'plans.translations' => route.call('GET', "#{subscriptions_base}/plans/:planId/translations"),
     'plans.upsertTranslation' => route.call('PATCH', "#{subscriptions_base}/plans/:planId/translations/:locale", free: true),
 
-    'customers.upsert' => route.call('PUT', "#{subscriptions_base}/customers", idempotency_key: 'optional',
-      required: %w[externalId], optional: %w[email name phone locale metadata]),
+    'customers.upsert' => route.call('PUT', "#{subscriptions_base}/customers",
+                                     idempotency_key: 'optional', required: %w[externalId], optional: %w[email name phone locale metadata]),
     'customers.get' => route.call('GET', "#{subscriptions_base}/customers/:customerId"),
     'customers.getByExternalId' => route.call('GET', "#{subscriptions_base}/customers/by-external/:externalId"),
     'customers.list' => route.call('GET', "#{subscriptions_base}/customers", query: %w[search includeArchived] + cursor_query),
@@ -166,9 +166,9 @@ module Lunixi
     'customers.adjustCredit' => route.call('POST', "#{subscriptions_base}/customers/:customerId/credit-balance/adjust", free: true),
     'customers.archive' => route.call('DELETE', "#{subscriptions_base}/customers/:customerId"),
 
-    'cards.add' => route.call('POST', "#{subscriptions_base}/cards", idempotency_key: 'optional',
-      required: %w[customerId paymentMethodToken],
-      optional: %w[brand last4 bin expireMonth expireYear cardholderName isDefault nickname verificationMode supportedCurrencies]),
+    'cards.add' => route.call('POST', "#{subscriptions_base}/cards",
+                              idempotency_key: 'optional', required: %w[customerId paymentMethodToken],
+                              optional: %w[brand last4 bin expireMonth expireYear cardholderName isDefault nickname verificationMode supportedCurrencies]),
     'cards.get' => route.call('GET', "#{subscriptions_base}/cards/:cardId"),
     'cards.list' => route.call('GET', "#{subscriptions_base}/cards", query: %w[customerId includeInactive] + cursor_query),
     'cards.setDefault' => route.call('POST', "#{subscriptions_base}/cards/:cardId/set-default"),
@@ -182,7 +182,7 @@ module Lunixi
     'invoices.retryCharge' => route.call('POST', "#{subscriptions_base}/invoices/:invoiceId/retry-charge", idempotency_key: 'optional'),
 
     'portal.createSdkSession' => route.call('POST', "#{subscriptions_base}/portal/sdk-session",
-      required: %w[customerId origin], optional: %w[sdkMode portalLinkId]),
+                                            required: %w[customerId origin], optional: %w[sdkMode portalLinkId]),
     'portal.createPortalLink' => route.call('POST', "#{portal_panel}/links", free: true),
     'portal.listLinks' => route.call('GET', "#{portal_panel}/links", query: %w[customerId status limit]),
     'portal.getLink' => route.call('GET', "#{portal_panel}/links/:linkId"),

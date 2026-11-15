@@ -36,7 +36,7 @@ class SubscriptionsTest < Minitest::Test
   end
 
   def test_create_takes_the_key_from_the_request
-    @subscriptions.create({ customerId: "cus_1", planId: "plan_1", idempotencyKey: "idem-sub-2" })
+    @subscriptions.create({ customerId: 'cus_1', planId: 'plan_1', idempotencyKey: 'idem-sub-2' })
     assert_equal 'idem-sub-2', api_calls(@transport).fetch(0)[:headers]['Idempotency-Key']
   end
 
@@ -100,7 +100,7 @@ class SubscriptionsTest < Minitest::Test
     assert_equal({ 'frequency' => 'MONTHLY', 'interval' => 1 }, sent_json(call)['billing'])
     assert_equal 'TRY', sent_json(call)['currency']
     [
-      plan.merge(price: 9900), plan.merge(price: '99.00'), plan.reject { |key, _| key == :price }, plan.merge(currency: 'XXX'),
+      plan.merge(price: 9900), plan.merge(price: '99.00'), plan.except(:price), plan.merge(currency: 'XXX'),
       plan.merge(billing: { frequency: 'HOURLY' }), plan.merge(billing: { frequency: 'DAILY', interval: 0 }),
       plan.merge(billing: { frequency: 'DAILY', anchor: 1 }), plan.merge(trialPeriodDays: -1), plan.merge(dunningScheduleDays: [1, 'x'])
     ].each { |body| assert_raises(Lunixi::ConfigurationError) { @subscriptions.plans.create(body) } }

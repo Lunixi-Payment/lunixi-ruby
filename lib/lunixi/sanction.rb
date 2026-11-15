@@ -81,7 +81,7 @@ module Lunixi
     end
 
     def iterate_screening_history(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_screening_history(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_screening_history(**query) }
     end
 
     # Registers a subject for ongoing monitoring; returns { monitoredEntityId }. A profile Hash (name,
@@ -99,7 +99,7 @@ module Lunixi
 
         body = body.merge('profileJson' => JsonBody.dump(request[profile_key]))
       end
-      RouteRequest.unwrap(invoke('registerMonitoring', body: body))
+      RouteResponse.unwrap(invoke('registerMonitoring', body: body))
     end
 
     # New-match alerts raised by monitoring; status narrows (e.g. open).
@@ -108,7 +108,7 @@ module Lunixi
     end
 
     def iterate_monitoring_alerts(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_monitoring_alerts(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_monitoring_alerts(**query) }
     end
 
     # Monitored subjects; activeOnly defaults to true on the gateway.
@@ -117,7 +117,7 @@ module Lunixi
     end
 
     def iterate_monitored_entities(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_monitored_entities(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_monitored_entities(**query) }
     end
 
     # Matches raised by monitoring.
@@ -126,17 +126,17 @@ module Lunixi
     end
 
     def iterate_monitoring_matches(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_monitoring_matches(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_monitoring_matches(**query) }
     end
 
     # Freshness of the source lists: { manifest }. A manifest that could not be produced raises ApiError.
-    def get_dataset_freshness
+    def get_dataset_freshness # rubocop:disable Naming/AccessorMethodName -- catalog operation getDatasetFreshness
       checked(invoke('getDatasetFreshness'))
     end
 
     # Entity search by name: q, limit.
     def search_entities(**filters)
-      RouteRequest.unwrap(invoke('searchEntities', query: filters))
+      RouteResponse.unwrap(invoke('searchEntities', query: filters))
     end
 
     # Entity risk profile; screening_request_id reads it on that screening's publication.
@@ -165,7 +165,7 @@ module Lunixi
     end
 
     def iterate_blacklist_entries(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_blacklist_entries(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_blacklist_entries(**query) }
     end
 
     def inspect
@@ -179,11 +179,11 @@ module Lunixi
     end
 
     def page(name, filters)
-      RouteRequest.page(invoke(name, query: filters))
+      RouteResponse.page(invoke(name, query: filters))
     end
 
     def entity(name, entity_id, query)
-      RouteRequest.unwrap(invoke(name, params: { 'entityId' => entity_id }, query: RouteRequest.compact(query)))
+      RouteResponse.unwrap(invoke(name, params: { 'entityId' => entity_id }, query: RouteRequest.compact(query)))
     end
 
     # Sends one route of SANCTION_ROUTES with the access token (no request signature).
@@ -197,7 +197,7 @@ module Lunixi
 
     def body!(name, route, body)
       plain = RouteRequest.fields!(body, route['required'], route['optional'], name)
-      if route['anyOf'] && route['anyOf'].none? { |key| RouteRequest.present?(plain[key]) }
+      if route['anyOf']&.none? { |key| RouteRequest.present?(plain[key]) }
         raise ConfigurationError, "#{name} requires at least one of #{route['anyOf'].join(', ')}."
       end
 
@@ -231,7 +231,7 @@ module Lunixi
         raise ApiError.new(status: status, code: response['code'], request_id: response['requestId'], message: 'The screening did not complete.')
       end
 
-      RouteRequest.unwrap(response)
+      RouteResponse.unwrap(response)
     end
 
     def id_list(entity_ids)

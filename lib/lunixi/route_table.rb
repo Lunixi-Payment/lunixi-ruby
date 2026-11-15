@@ -14,7 +14,7 @@ module Lunixi
   #
   # Every check runs before anything is sent and raises ConfigurationError naming the field, never its
   # value (card data and document images included). Subscription and marketplace routes carry money:
-  # bodies, filters and answers are checked with Money.validate_wire. Not a public API.
+  # bodies, filters and answers are checked with WireMoney.validate_wire. Not a public API.
   class RouteTable
     MONEY_ROUTE = %r{\A/api/v1/(?:subscriptions|marketplace)(?:/|\z)}
     # Routes whose Idempotency-Key is any non-empty string without control characters (sent trimmed).
@@ -25,7 +25,7 @@ module Lunixi
     def self.idempotency_key!(key, name = nil)
       value = key.is_a?(String) ? key.strip : ''
       if value.empty? || value.match?(CONTROL_CHARACTERS)
-        raise ConfigurationError, "The Idempotency-Key#{name ? " of #{name}" : ''} must be a non-empty string without control characters."
+        raise ConfigurationError, "The Idempotency-Key#{" of #{name}" if name} must be a non-empty string without control characters."
       end
 
       value
@@ -56,29 +56,29 @@ module Lunixi
       payload = body!(name, route, body)
       money = path.match?(MONEY_ROUTE)
       if money
-        Money.validate_wire(payload)
-        Money.validate_wire(filters)
+        WireMoney.validate_wire(payload)
+        WireMoney.validate_wire(filters)
       end
       response = @client.request(route['method'], path, body: payload, query: filters, idempotency_key: key, signed: route['stepUp'] == true)
-      Money.validate_wire(response) if money
+      WireMoney.validate_wire(response) if money
       response
     end
 
     # The envelope's data.
-    def data(name, **options)
-      RouteRequest.unwrap(call(name, **options))
+    def data(name, **)
+      RouteResponse.unwrap(call(name, **))
     end
 
     # A Lunixi::ListPage.
-    def page(name, **options)
-      RouteRequest.cursor_page(call(name, **options))
+    def page(name, **)
+      RouteResponse.cursor_page(call(name, **))
     end
 
     # A subscription list: the cursor is nextPageToken (send it back as page_token:) and page_size the
     # envelope's pageSize (the row count when there is none).
-    def token_page(name, **options)
-      response = call(name, **options)
-      page = RouteRequest.cursor_page(response)
+    def token_page(name, **)
+      response = call(name, **)
+      page = RouteResponse.cursor_page(response)
       size = response.is_a?(Hash) && response['pageSize'].is_a?(Integer) ? response['pageSize'] : page.items.length
       ListPage.new(items: page.items, next_cursor: page.next_cursor, has_more: page.has_more, total_count: page.total_count,
                    raw: page.raw, page_size: size)

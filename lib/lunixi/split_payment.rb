@@ -103,7 +103,7 @@ module Lunixi
       block = leg[block_name]
       raise ConfigurationError, "#{path}: paymentMethod #{method} requires the '#{block_name}' block" unless block.is_a?(Hash)
 
-      fields = block.reject { |key, _| key == 'providerCode' }
+      fields = block.except('providerCode')
       MethodFields.provider_code!(block['providerCode']) unless block['providerCode'].nil?
       MethodFields.method_fields!(fields, "#{path}.#{block_name}")
       return unless method == PaymentMethod::PROMISSORY_NOTE
@@ -132,10 +132,10 @@ module Lunixi
       end
     end
 
-    def values!(key, value)
+    def values!(key, value, &)
       values = Array(value)
       raise ConfigurationError, "#{key} takes 1 to #{LIST_MAX_VALUES} values" if values.empty? || values.size > LIST_MAX_VALUES
-      raise ConfigurationError, "#{key} contains an invalid value" unless values.all? { |entry| yield entry }
+      raise ConfigurationError, "#{key} contains an invalid value" unless values.all?(&)
 
       values
     end

@@ -165,16 +165,17 @@ module Lunixi
   # bank-connect:transfer plus a key with an IP allowlist.
   BANK_TRANSFER_ROUTES = {
     'listTransferPurposes' => RouteRequest.route('GET', '/api/v1/bank-connect/transfer-purposes', idempotency_key: false, query: %w[connectionId]),
-    'createTransfer' => RouteRequest.route('POST', '/api/v1/bank-connect/transfers', idempotency_key: true,
-      required: %w[accountId receiverIban receiverName amountMinor], optional: %w[currency paymentPurpose description]),
-    'listTransfers' => RouteRequest.route('GET', '/api/v1/bank-connect/transfers', idempotency_key: false,
-      query: %w[limit cursor accountId status createdFrom createdTo]),
+    'createTransfer' => RouteRequest.route('POST', '/api/v1/bank-connect/transfers',
+                                           idempotency_key: true, required: %w[accountId receiverIban receiverName amountMinor],
+                                           optional: %w[currency paymentPurpose description]),
+    'listTransfers' => RouteRequest.route('GET', '/api/v1/bank-connect/transfers',
+                                          idempotency_key: false, query: %w[limit cursor accountId status createdFrom createdTo]),
     'getTransfer' => RouteRequest.route('GET', '/api/v1/bank-connect/transfers/:transferId', idempotency_key: false),
     'listFxRates' => RouteRequest.route('GET', '/api/v1/bank-connect/fx/rates', idempotency_key: false, query: %w[connectionId]),
-    'createFxQuote' => RouteRequest.route('POST', '/api/v1/bank-connect/fx/quotes', idempotency_key: false,
-      required: %w[sourceAccountId targetAccountId], optional: %w[sourceAmountMinor targetAmountMinor]),
-    'createFxOrder' => RouteRequest.route('POST', '/api/v1/bank-connect/fx/orders', idempotency_key: true,
-      required: %w[quoteId], optional: %w[description]),
+    'createFxQuote' => RouteRequest.route('POST', '/api/v1/bank-connect/fx/quotes',
+                                          idempotency_key: false, required: %w[sourceAccountId targetAccountId],
+                                          optional: %w[sourceAmountMinor targetAmountMinor]),
+    'createFxOrder' => RouteRequest.route('POST', '/api/v1/bank-connect/fx/orders', idempotency_key: true, required: %w[quoteId], optional: %w[description]),
     'listFxOrders' => RouteRequest.route('GET', '/api/v1/bank-connect/fx/orders', idempotency_key: false, query: %w[limit cursor status]),
     'getFxOrder' => RouteRequest.route('GET', '/api/v1/bank-connect/fx/orders/:orderId', idempotency_key: false)
   }.freeze

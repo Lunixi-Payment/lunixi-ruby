@@ -36,7 +36,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     def get(end_user_id)
@@ -134,7 +134,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     # Imports up to 1000 employees at once; all or nothing (a 422 writes nothing). rows: [{ phone, ... }].
@@ -238,7 +238,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     # { operation, history }
@@ -327,7 +327,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     def get(qr_id)

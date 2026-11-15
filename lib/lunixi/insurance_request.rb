@@ -57,12 +57,12 @@ module Lunixi
         end
 
         value
-      when 'currency' then RouteRequest.currency!(value, key)
+      when 'currency' then RouteValue.currency!(value, key)
       when 'paymentIntentId', 'connectionId' then uuid!(value, key)
-      when 'from', 'to' then RouteRequest.iso_time!(value, key)
-      when 'merchantOrderId' then RouteRequest.text!(value, key, TEXT_MAX_LENGTH)
+      when 'from', 'to' then RouteValue.iso_time!(value, key)
+      when 'merchantOrderId' then RouteValue.text!(value, key, TEXT_MAX_LENGTH)
       when 'status' then lead_status!(value)
-      else RouteRequest.text!(value, key, CODE_MAX_LENGTH)
+      else RouteValue.text!(value, key, CODE_MAX_LENGTH)
       end
     end
 
@@ -89,7 +89,7 @@ module Lunixi
     def context!(value)
       context = RouteRequest.wire_keys!(value, %w[items], 'context')
       items = context['items']
-      unless items.is_a?(Array) && items.length.between?(1, INSURANCE_MAX_CONTEXT_ITEMS) && items.all? { |item| item.is_a?(Hash) }
+      unless items.is_a?(Array) && items.length.between?(1, INSURANCE_MAX_CONTEXT_ITEMS) && items.all?(Hash)
         raise ConfigurationError, "'context.items' must hold 1 to #{INSURANCE_MAX_CONTEXT_ITEMS} basket items."
       end
 

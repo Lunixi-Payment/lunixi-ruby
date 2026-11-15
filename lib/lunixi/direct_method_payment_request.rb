@@ -203,7 +203,7 @@ module Lunixi
         MethodFields.provider_code!(block['providerCode'])
       end
       excluded = method == PaymentMethod::PROMISSORY_NOTE ? %w[providerCode schedule] : %w[providerCode]
-      MethodFields.method_fields!(block.reject { |key, _| excluded.include?(key) }, block_name)
+      MethodFields.method_fields!(block.except(*excluded), block_name)
     end
 
     private_class_method :blocks!, :method_block!

@@ -84,7 +84,7 @@ class BankConnectTest < Minitest::Test
       transfer_request.merge(paymentPurpose: 'not valid!'),
       transfer_request.merge(description: 'x' * 141),
       transfer_request.merge(environment: 'LIVE'),
-      transfer_request.reject { |key, _| key == :accountId }
+      transfer_request.except(:accountId)
     ].each { |request| assert_raises(Lunixi::ConfigurationError) { @bank.transfers.create(request) } }
     assert_empty api_calls(@transport)
   end

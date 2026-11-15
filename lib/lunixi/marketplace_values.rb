@@ -44,7 +44,7 @@ module Lunixi
   marketplace_base = '/api/v1/marketplace'
   split_base = '/api/v1/payments/marketplace'
   route = lambda do |method, path, **extra|
-    RouteRequest.route(method, path, **{ step_up: false, idempotency_key: 'none' }.merge(extra))
+    RouteRequest.route(method, path, step_up: false, idempotency_key: 'none', **extra)
   end
   charge = ->(path) { route.call('POST', path, step_up: true, idempotency_key: 'optional', free: true) }
 
@@ -56,7 +56,7 @@ module Lunixi
     'chargeMarketplaceCard3d' => charge.call("#{split_base}/3d"),
 
     'createDealer' => route.call('POST', "#{marketplace_base}/dealers", required: %w[legalName],
-                                                                       optional: %w[taxId dealerType categoryCode email externalRef]),
+                                                                        optional: %w[taxId dealerType categoryCode email externalRef]),
     'bulkCreateDealers' => route.call('POST', "#{marketplace_base}/dealers/bulk", required: %w[dealers]),
     'listDealers' => route.call('GET', "#{marketplace_base}/dealers", query: %w[status search limit offset]),
     'getDealer' => route.call('GET', "#{marketplace_base}/dealers/:dealerId"),

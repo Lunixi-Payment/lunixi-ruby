@@ -80,9 +80,7 @@ module Lunixi
     # non-decreasing order. Returns string-keyed copies of the rows.
     def schedule!(rows, path = 'promissoryNote.schedule')
       raise ConfigurationError, "#{path} must be a nonempty list of { amount, dueDate } rows" unless rows.is_a?(Array) && !rows.empty?
-      if rows.size > PROMISSORY_NOTE_MAX_SCHEDULE_ITEMS
-        raise ConfigurationError, "#{path} can have at most #{PROMISSORY_NOTE_MAX_SCHEDULE_ITEMS} rows"
-      end
+      raise ConfigurationError, "#{path} can have at most #{PROMISSORY_NOTE_MAX_SCHEDULE_ITEMS} rows" if rows.size > PROMISSORY_NOTE_MAX_SCHEDULE_ITEMS
 
       previous = nil
       rows.each_with_index.map do |row, index|

@@ -25,7 +25,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block, :pageToken) { |query| list(**query) }
+      RouteResponse.each_item(filters, block, :pageToken) { |query| list(**query) }
     end
 
     # Price, billing, metadata ...; a price is a minor-unit string.
@@ -71,7 +71,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block, :pageToken) { |query| list(**query) }
+      RouteResponse.each_item(filters, block, :pageToken) { |query| list(**query) }
     end
 
     def credit_balance(customer_id)
@@ -109,23 +109,23 @@ module Lunixi
 
     # A customer's cards.
     def list(customer_id, include_inactive: false, page_token: nil, page_size: nil)
-      query = { 'customerId' => RouteRequest.text!(customer_id, 'customerId'), 'includeInactive' => include_inactive,
+      query = { 'customerId' => RouteValue.text!(customer_id, 'customerId'), 'includeInactive' => include_inactive,
                 'pageToken' => page_token, 'pageSize' => page_size }
       @routes.token_page('cards.list', query: RouteRequest.compact(query))
     end
 
     def iterate(customer_id, include_inactive: false, page_size: nil, &block)
       filters = RouteRequest.compact(include_inactive: include_inactive, page_size: page_size)
-      RouteRequest.each_item(filters, block, :page_token) { |query| list(customer_id, **query) }
+      RouteResponse.each_item(filters, block, :page_token) { |query| list(customer_id, **query) }
     end
 
-    def set_default(card_id)
+    def set_default(card_id) # rubocop:disable Naming/AccessorMethodName -- catalog operation cards.setDefault
       @routes.data('cards.setDefault', params: { 'cardId' => card_id })
     end
 
     def deactivate(card_id, reason: nil)
       @routes.data('cards.deactivate', params: { 'cardId' => card_id },
-                                       body: RouteRequest.compact('reason' => RouteRequest.optional_text(reason, 'reason')))
+                                       body: RouteRequest.compact('reason' => RouteValue.optional_text(reason, 'reason')))
     end
 
     # Verifies a saved card (a small authorisation or a 3-D check); options as the gateway documents them.
@@ -151,7 +151,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block, :pageToken) { |query| list(**query) }
+      RouteResponse.each_item(filters, block, :pageToken) { |query| list(**query) }
     end
 
     def get(invoice_id)
@@ -160,7 +160,7 @@ module Lunixi
 
     def void(invoice_id, reason: nil)
       @routes.data('invoices.void', params: { 'invoiceId' => invoice_id },
-                                    body: RouteRequest.compact('reason' => RouteRequest.optional_text(reason, 'reason')))
+                                    body: RouteRequest.compact('reason' => RouteValue.optional_text(reason, 'reason')))
     end
 
     def retry_charge(invoice_id, idempotency_key: nil)
@@ -180,11 +180,11 @@ module Lunixi
     # Returns { portalToken, sessionProof, proofNonce, proofExpiresAt, ... } (the gateway answers at the
     # envelope root); hand those four to the browser.
     def create_sdk_session(customer_id, origin, sdk_mode: nil, portal_link_id: nil)
-      RouteRequest.one_of!(sdk_mode, SubscriptionPortalSdkMode::ALL, 'sdkMode') unless sdk_mode.nil? || sdk_mode == ''
-      body = RouteRequest.compact('customerId' => RouteRequest.text!(customer_id, 'customerId'), 'origin' => RouteRequest.text!(origin, 'origin'),
-                                  'sdkMode' => RouteRequest.optional_text(sdk_mode, 'sdkMode'),
-                                  'portalLinkId' => RouteRequest.optional_text(portal_link_id, 'portalLinkId'))
-      session = RouteRequest.merge_root(@routes.call('portal.createSdkSession', body: body))
+      RouteValue.one_of!(sdk_mode, SubscriptionPortalSdkMode::ALL, 'sdkMode') unless sdk_mode.nil? || sdk_mode == ''
+      body = RouteRequest.compact('customerId' => RouteValue.text!(customer_id, 'customerId'), 'origin' => RouteValue.text!(origin, 'origin'),
+                                  'sdkMode' => RouteValue.optional_text(sdk_mode, 'sdkMode'),
+                                  'portalLinkId' => RouteValue.optional_text(portal_link_id, 'portalLinkId'))
+      session = RouteResponse.merge_root(@routes.call('portal.createSdkSession', body: body))
       session['proofNonce'] = session['nonce'] if !session.key?('proofNonce') && session.key?('nonce')
       session['proofExpiresAt'] = session['expiresAt'] if !session.key?('proofExpiresAt') && session.key?('expiresAt')
       session
@@ -193,7 +193,7 @@ module Lunixi
     # options: allowedPlanIds, defaultPlanId, permissions, sessionDurationMinutes, expiresAt,
     # requireEmailVerification ...
     def create_portal_link(customer_id, options = {})
-      body = RouteRequest.wire_hash!(options, 'create_portal_link options').merge('customerId' => RouteRequest.text!(customer_id, 'customerId'))
+      body = RouteRequest.wire_hash!(options, 'create_portal_link options').merge('customerId' => RouteValue.text!(customer_id, 'customerId'))
       @routes.data('portal.createPortalLink', body: body)
     end
 
@@ -212,7 +212,7 @@ module Lunixi
 
     def revoke_link(link_id, reason: nil)
       @routes.data('portal.revokeLink', params: { 'linkId' => link_id },
-                                        body: RouteRequest.compact('reason' => RouteRequest.optional_text(reason, 'reason')))
+                                        body: RouteRequest.compact('reason' => RouteValue.optional_text(reason, 'reason')))
     end
 
     def link_activity(link_id)
@@ -225,7 +225,7 @@ module Lunixi
     end
 
     # Portal settings (branding, allowed origins).
-    def get_settings
+    def get_settings # rubocop:disable Naming/AccessorMethodName -- catalog operation portal.getSettings
       @routes.data('portal.getSettings')
     end
 
@@ -250,7 +250,7 @@ module Lunixi
     end
 
     def iterate(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list(**query) }
+      RouteResponse.each_item(filters, block) { |query| list(**query) }
     end
 
     def get(product_id)

@@ -24,13 +24,11 @@ module Lunixi
     # them (a Time or an ISO 8601 string with a time zone, not in the future).
     def self.consent_from_quote(option, accepted_at)
       terms = option.is_a?(Hash) ? option['terms'] : nil
-      unless terms.is_a?(Hash)
-        raise ConfigurationError, "The quote option has no 'terms': pass an option returned by create_quote or get_quote."
-      end
+      raise ConfigurationError, "The quote option has no 'terms': pass an option returned by create_quote or get_quote." unless terms.is_a?(Hash)
 
-      { 'termsVersion' => RouteRequest.text!(terms['version'], 'terms.version'),
-        'termsSha256' => RouteRequest.text!(terms['sha256'], 'terms.sha256'),
-        'acceptedAt' => RouteRequest.iso_time!(accepted_at, 'acceptedAt') }
+      { 'termsVersion' => RouteValue.text!(terms['version'], 'terms.version'),
+        'termsSha256' => RouteValue.text!(terms['sha256'], 'terms.sha256'),
+        'acceptedAt' => RouteValue.iso_time!(accepted_at, 'acceptedAt') }
     end
 
     # The premium basket item for a payment that collects the premium of an order (premiumCollectedBy
@@ -43,10 +41,10 @@ module Lunixi
         raise ConfigurationError, 'Only an order whose premium you collect (premiumCollectedBy MERCHANT) has a premium basket item.'
       end
 
-      item = { 'id' => RouteRequest.text!(order['orderId'], 'order.orderId'),
-               'name' => RouteRequest.text!(name, 'name'),
-               'category1' => RouteRequest.text!(category1, 'category1') }
-      item['category2'] = RouteRequest.text!(category2, 'category2') unless category2.nil? || category2 == ''
+      item = { 'id' => RouteValue.text!(order['orderId'], 'order.orderId'),
+               'name' => RouteValue.text!(name, 'name'),
+               'category1' => RouteValue.text!(category1, 'category1') }
+      item['category2'] = RouteValue.text!(category2, 'category2') unless category2.nil? || category2 == ''
       item.merge('itemType' => 'VIRTUAL', 'price' => InsuranceRequest.positive_minor!(order['premiumAmount'], 'order.premiumAmount'))
     end
 
@@ -64,20 +62,20 @@ module Lunixi
     # { currency, insuranceType?, context: { items } }.
     def search_products(request)
       body = RouteRequest.wire_keys!(request, INSURANCE_PRODUCT_SEARCH_FIELDS, 'searchProducts request')
-      payload = { 'currency' => RouteRequest.currency!(body['currency'], 'currency'), 'context' => context(body, required: true) }
-      payload['insuranceType'] = RouteRequest.text!(body['insuranceType'], 'insuranceType') if RouteRequest.present?(body['insuranceType'])
+      payload = { 'currency' => RouteValue.currency!(body['currency'], 'currency'), 'context' => context(body, required: true) }
+      payload['insuranceType'] = RouteValue.text!(body['insuranceType'], 'insuranceType') if RouteRequest.present?(body['insuranceType'])
       write('/products', payload)
     end
 
     # I3. Reference codes of one kind (InsuranceReferenceKind), for the type fields that take a code.
     def list_reference_values(kind, **filters)
       path = "/reference/#{RouteRequest.path!(':kind', 'kind' => InsuranceRequest.reference_kind!(kind))}"
-      RouteRequest.page(@client.request('GET', BASE + path, query: InsuranceRequest.query!(filters, 'listReferenceValues')))
+      RouteResponse.page(@client.request('GET', BASE + path, query: InsuranceRequest.query!(filters, 'listReferenceValues')))
     end
 
     def iterate_reference_values(kind, **filters, &block)
       InsuranceRequest.reference_kind!(kind)
-      RouteRequest.each_item(filters, block) { |query| list_reference_values(kind, **query) }
+      RouteResponse.each_item(filters, block) { |query| list_reference_values(kind, **query) }
     end
 
     # I4. Prices an insurance type (HTTP 201): { insuranceType, schemaVersion, options[], excludedOptions[] }.
@@ -93,8 +91,8 @@ module Lunixi
                                   'payment), not both. Send neither for an insurance type sold without a basket item.'
       end
 
-      payload = body.merge('insuranceType' => RouteRequest.text!(body['insuranceType'], 'insuranceType'),
-                           'currency' => RouteRequest.currency!(body['currency'], 'currency'))
+      payload = body.merge('insuranceType' => RouteValue.text!(body['insuranceType'], 'insuranceType'),
+                           'currency' => RouteValue.currency!(body['currency'], 'currency'))
       payload['paymentIntentId'] = InsuranceRequest.uuid!(body['paymentIntentId'], 'paymentIntentId') if payment
       payload['context'] = context(body, required: true) if items
       merchant_order_id!(payload)
@@ -112,21 +110,21 @@ module Lunixi
       key = InsuranceRequest.required_key!(idempotency_key, 'insurance order create')
       body = RouteRequest.wire_keys!(request, INSURANCE_ORDER_FIELDS, 'createOrder request')
       consent = RouteRequest.wire_keys!(body['consent'], INSURANCE_CONSENT_FIELDS, 'consent')
-      payload = { 'quoteId' => RouteRequest.text!(body['quoteId'], 'quoteId'), 'merchantOrderId' => body['merchantOrderId'],
-                  'consent' => { 'termsVersion' => RouteRequest.text!(consent['termsVersion'], 'consent.termsVersion'),
-                                 'termsSha256' => RouteRequest.text!(consent['termsSha256'], 'consent.termsSha256'),
-                                 'acceptedAt' => RouteRequest.iso_time!(consent['acceptedAt'], 'consent.acceptedAt') } }
+      payload = { 'quoteId' => RouteValue.text!(body['quoteId'], 'quoteId'), 'merchantOrderId' => body['merchantOrderId'],
+                  'consent' => { 'termsVersion' => RouteValue.text!(consent['termsVersion'], 'consent.termsVersion'),
+                                 'termsSha256' => RouteValue.text!(consent['termsSha256'], 'consent.termsSha256'),
+                                 'acceptedAt' => RouteValue.iso_time!(consent['acceptedAt'], 'consent.acceptedAt') } }
       merchant_order_id!(payload)
       write('/orders', RouteRequest.compact(payload), key)
     end
 
     # I7. Your insurance orders, newest first.
     def list_orders(**filters)
-      RouteRequest.page(@client.request('GET', "#{BASE}/orders", query: InsuranceRequest.query!(filters, 'listOrders')))
+      RouteResponse.page(@client.request('GET', "#{BASE}/orders", query: InsuranceRequest.query!(filters, 'listOrders')))
     end
 
     def iterate_orders(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_orders(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_orders(**query) }
     end
 
     # I8. 404 insurance.order.not_found for an unknown or another merchant's order.
@@ -147,12 +145,12 @@ module Lunixi
     def confirm_payment(order_id, payment, idempotency_key: nil)
       key = InsuranceRequest.required_key!(idempotency_key, 'insurance payment confirmation')
       body = RouteRequest.wire_keys!(payment, INSURANCE_EXTERNAL_PAYMENT_FIELDS, 'payment')
-      payload = { 'externalPaymentId' => RouteRequest.text!(body['externalPaymentId'], 'payment.externalPaymentId', InsuranceRequest::TEXT_MAX_LENGTH),
+      payload = { 'externalPaymentId' => RouteValue.text!(body['externalPaymentId'], 'payment.externalPaymentId', InsuranceRequest::TEXT_MAX_LENGTH),
                   'paidAmount' => InsuranceRequest.positive_minor!(body['paidAmount'], 'payment.paidAmount'),
-                  'paidCurrency' => RouteRequest.currency!(body['paidCurrency'], 'payment.paidCurrency'),
-                  'paidAt' => RouteRequest.iso_time!(body['paidAt'], 'payment.paidAt') }
+                  'paidCurrency' => RouteValue.currency!(body['paidCurrency'], 'payment.paidCurrency'),
+                  'paidAt' => RouteValue.iso_time!(body['paidAt'], 'payment.paidAt') }
       if RouteRequest.present?(body['paymentProvider'])
-        payload['paymentProvider'] = RouteRequest.text!(body['paymentProvider'], 'payment.paymentProvider', InsuranceRequest::CODE_MAX_LENGTH)
+        payload['paymentProvider'] = RouteValue.text!(body['paymentProvider'], 'payment.paymentProvider', InsuranceRequest::CODE_MAX_LENGTH)
       end
       write("#{order_path(order_id)}/confirm-payment", { 'payment' => payload }, key)
     end
@@ -178,8 +176,8 @@ module Lunixi
       unless external_refund.nil?
         refund = RouteRequest.wire_keys!(external_refund, INSURANCE_EXTERNAL_REFUND_FIELDS, 'externalRefund')
         payload['externalRefund'] = {
-          'externalRefundId' => RouteRequest.text!(refund['externalRefundId'], 'externalRefund.externalRefundId', InsuranceRequest::TEXT_MAX_LENGTH),
-          'refundedAt' => RouteRequest.iso_time!(refund['refundedAt'], 'externalRefund.refundedAt')
+          'externalRefundId' => RouteValue.text!(refund['externalRefundId'], 'externalRefund.externalRefundId', InsuranceRequest::TEXT_MAX_LENGTH),
+          'refundedAt' => RouteValue.iso_time!(refund['refundedAt'], 'externalRefund.refundedAt')
         }
       end
       write("#{order_path(order_id)}/refund-premium", payload, key)
@@ -212,11 +210,11 @@ module Lunixi
     # I16. The orders and policies behind the summary for the same filter, newest first.
     def list_reconciliation_orders(**filters)
       query = InsuranceRequest.query!(filters, 'listReconciliationOrders', %w[from to])
-      RouteRequest.page(@client.request('GET', "#{BASE}/reconciliation/orders", query: query))
+      RouteResponse.page(@client.request('GET', "#{BASE}/reconciliation/orders", query: query))
     end
 
     def iterate_reconciliation_orders(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_reconciliation_orders(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_reconciliation_orders(**query) }
     end
 
     # I17. The reconciliation report as CSV: a Lunixi::InsuranceReconciliationExport (data bytes,
@@ -233,7 +231,7 @@ module Lunixi
     def create_lead(request, idempotency_key: nil)
       key = InsuranceRequest.required_key!(idempotency_key, 'insurance lead submit')
       body = RouteRequest.wire_keys!(request, INSURANCE_LEAD_FIELDS, 'createLead request')
-      payload = body.merge('insuranceType' => RouteRequest.text!(body['insuranceType'], 'insuranceType', InsuranceRequest::CODE_MAX_LENGTH))
+      payload = body.merge('insuranceType' => RouteValue.text!(body['insuranceType'], 'insuranceType', InsuranceRequest::CODE_MAX_LENGTH))
       payload['note'] = InsuranceRequest.lead_note!(body['note']) if body.key?('note')
       payload.delete('note') if payload['note'] == ''
       write('/leads', payload, key)
@@ -241,11 +239,11 @@ module Lunixi
 
     # I19. Your leads, newest first; personal data is masked in requestMasked.
     def list_leads(**filters)
-      RouteRequest.page(@client.request('GET', "#{BASE}/leads", query: InsuranceRequest.query!(filters, 'listLeads')))
+      RouteResponse.page(@client.request('GET', "#{BASE}/leads", query: InsuranceRequest.query!(filters, 'listLeads')))
     end
 
     def iterate_leads(**filters, &block)
-      RouteRequest.each_item(filters, block) { |query| list_leads(**query) }
+      RouteResponse.each_item(filters, block) { |query| list_leads(**query) }
     end
 
     # I20. 404 insurance.lead.not_found for an unknown or another merchant's lead.
@@ -260,11 +258,11 @@ module Lunixi
     private
 
     def read(path, query = {})
-      RouteRequest.unwrap(@client.request('GET', BASE + path, query: query))
+      RouteResponse.unwrap(@client.request('GET', BASE + path, query: query))
     end
 
     def write(path, body, key = nil)
-      RouteRequest.unwrap(@client.request('POST', BASE + path, body: body, idempotency_key: key))
+      RouteResponse.unwrap(@client.request('POST', BASE + path, body: body, idempotency_key: key))
     end
 
     def policy_file(policy_id, file)
@@ -279,7 +277,7 @@ module Lunixi
 
     def merchant_order_id!(payload)
       if RouteRequest.present?(payload['merchantOrderId'])
-        payload['merchantOrderId'] = RouteRequest.text!(payload['merchantOrderId'], 'merchantOrderId', InsuranceRequest::TEXT_MAX_LENGTH)
+        payload['merchantOrderId'] = RouteValue.text!(payload['merchantOrderId'], 'merchantOrderId', InsuranceRequest::TEXT_MAX_LENGTH)
       else
         payload.delete('merchantOrderId')
       end
