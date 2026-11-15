@@ -8,7 +8,11 @@ module Lunixi
   class Client
     AUTH_PATH = '/api/v1/auth/token'
     METHODS = %w[GET HEAD POST PUT PATCH DELETE].freeze
-    attr_reader :payments, :fraud
+    ACCEPT_JSON = 'application/json'
+    # The customer-portal link routes of subscriptions live under the panel API.
+    PANEL_PORTAL_PATH = %r{\A/api/panel/v1/subscriptions/portal(?:/|\z)}
+    attr_reader :payments, :fraud, :reference, :payment_links, :physical_pos, :physical_pos_management, :wallet, :bank_connect, :sanction,
+                :insurance, :subscriptions, :kyc, :identity, :marketplace
 
     def initialize(base_url:, key_id:, private_key:, timeout: 30, max_retries: 2, transport: nil,
                    clock: -> { Time.now.utc }, sleeper: ->(seconds) { sleep(seconds) }, ca_file: nil)
@@ -28,17 +32,35 @@ module Lunixi
       @token_expires_at = Time.at(0)
       @payments = Payments.new(self)
       @fraud = Fraud.new(self)
+      @reference = Reference.new(self)
+      @payment_links = PaymentLinks.new(self, storage_transport: @transport)
+      physical_pos_gateway = PhysicalPosGateway.new(self, max_retries: max_retries, backoff: ->(attempt) { pause(attempt, {}) })
+      @physical_pos = PhysicalPos.new(physical_pos_gateway)
+      @physical_pos_management = PhysicalPosManagement.new(physical_pos_gateway)
+      @wallet = Wallet.new(self)
+      @bank_connect = BankConnect.new(self, max_retries: max_retries, backoff: ->(attempt) { pause(attempt, {}) })
+      @sanction = Sanction.new(self)
+      @insurance = Insurance.new(self)
+      @subscriptions = Subscriptions.new(self)
+      @kyc = Kyc.new(self)
+      @identity = Identity.new(self)
+      @marketplace = Marketplace.new(self)
     end
 
     # Advanced, signed transport for other documented gateway surfaces. It does
-    # not invent field schemas, interpret financial results or retry an unsafe POST.
-    def request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false)
+    # not invent field schemas, interpret financial results or retry an unsafe POST. With binary: true a
+    # 2xx body is returned as frozen bytes; accept: names the media types the endpoint answers with.
+    # max_retries: lowers the client's retry budget for this call (0 sends a single attempt).
+    def request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false, accept: ACCEPT_JSON,
+                max_retries: nil)
       method = method.to_s.upcase
       raise ConfigurationError, 'Unsupported HTTP method' unless METHODS.include?(method)
       raise ConfigurationError, 'GET and HEAD cannot have a body' if %w[GET HEAD].include?(method) && !body.nil?
+      raise ConfigurationError, 'Invalid Accept header' unless accept.is_a?(String) && accept.match?(%r{\A[a-z0-9.+/*-]+(?:, ?[a-z0-9.+/*-]+)*\z})
 
+      retries = retry_budget(max_retries)
       path = safe_path(path, query)
-      key = self.class.idempotency_key!(idempotency_key) if idempotency_key
+      key = request_idempotency_key(path, idempotency_key) if idempotency_key
       Money.validate_operation_amount(path, body)
       if Money.fiat_route?(path)
         Money.validate_fields(body)
@@ -47,7 +69,7 @@ module Lunixi
       bytes = body.nil? ? nil : JsonBody.dump(body)
       raise ConfigurationError, 'Request body exceeds the size limit' if bytes && bytes.bytesize > 1024 * 1024
 
-      perform_request(method, path, bytes, key, signed, binary)
+      perform_request(method, path, bytes, key, signed, binary, accept, retries)
     end
 
     # Validates caller-owned durable keys; a generated key on every retry is unsafe.
@@ -65,34 +87,53 @@ module Lunixi
 
     private
 
-    def perform_request(method, path, bytes, key, signed, binary)
+    # Physical POS, bank-connect and insurance routes take 8–200 printable ASCII characters (sent as
+    # given); wallet routes 1–128 characters without control characters; subscription, KYC, identity and
+    # marketplace routes any non-empty key without control characters (sent trimmed).
+    def request_idempotency_key(path, key)
+      return PhysicalPosRequest.idempotency_key!(key) if path.match?(PhysicalPosRequest::ROUTE)
+      return RouteRequest.printable_idempotency_key!(key) if path.match?(RouteRequest::PRINTABLE_KEY_ROUTE)
+      return WalletInvoker.idempotency_key!(key) if path.match?(WalletInvoker::ROUTE)
+      return RouteTable.idempotency_key!(key) if path.match?(RouteTable::KEY_ROUTE)
+
+      self.class.idempotency_key!(key)
+    end
+
+    def retry_budget(max_retries)
+      return @max_retries if max_retries.nil?
+      raise ConfigurationError, "max_retries must be between 0 and #{@max_retries}" unless max_retries.is_a?(Integer) && max_retries.between?(0, @max_retries)
+
+      max_retries
+    end
+
+    def perform_request(method, path, bytes, key, signed, binary, accept, max_retries)
       safe_to_retry = %w[GET HEAD].include?(method) || !key.nil?
       retries = 0
       reauthenticated = false
       loop do
         token = access_token
-        response = transmit(method, path, bytes, key, token, signed)
+        response = transmit(method, path, bytes, key, token, signed, accept)
         if response.status == 401 && !reauthenticated && safe_to_retry
           invalidate_token(token)
           reauthenticated = true
           next
         end
-        if retryable_response?(response, safe_to_retry, retries)
+        if retryable_response?(response, safe_to_retry, retries, max_retries)
           pause(retries, response.headers)
           retries += 1
           next
         end
         return decode_response(response, binary: binary, fiat: Money.fiat_route?(path), running_split: method == 'POST' && path == '/api/v1/payments/split')
       rescue TransportError
-        raise unless safe_to_retry && retries < @max_retries
+        raise unless safe_to_retry && retries < max_retries
 
         pause(retries, {})
         retries += 1
       end
     end
 
-    def retryable_response?(response, safe_to_retry, retries)
-      [429, 502, 503, 504].include?(response.status) && safe_to_retry && retries < @max_retries
+    def retryable_response?(response, safe_to_retry, retries, max_retries)
+      [429, 502, 503, 504].include?(response.status) && safe_to_retry && retries < max_retries
     end
 
     def validate_origin(value)
@@ -107,8 +148,8 @@ module Lunixi
     end
 
     def safe_path(path, query)
-      unless path.is_a?(String) && path.start_with?('/api/v1/') && path.match?(%r{\A/[a-zA-Z0-9_~./%-]+\z})
-        raise ConfigurationError, 'Only relative /api/v1/ gateway paths are accepted'
+      unless path.is_a?(String) && (path.start_with?('/api/v1/') || path.match?(PANEL_PORTAL_PATH)) && path.match?(%r{\A/[a-zA-Z0-9_~./%-]+\z})
+        raise ConfigurationError, 'Only relative /api/v1/ gateway paths (and the subscription portal panel routes) are accepted'
       end
 
       path.split('/').each do |segment|
@@ -147,8 +188,8 @@ module Lunixi
       headers
     end
 
-    def transmit(method, path, body, key, token, signed)
-      headers = { 'Accept' => 'application/json', 'User-Agent' => "lunixi-sdk-ruby/#{VERSION}" }
+    def transmit(method, path, body, key, token, signed, accept = ACCEPT_JSON)
+      headers = { 'Accept' => accept, 'User-Agent' => "lunixi-sdk-ruby/#{VERSION}" }
       headers['Authorization'] = "Bearer #{token}" if token
       headers['Content-Type'] = 'application/json' unless body.nil?
       headers['Idempotency-Key'] = key if key
@@ -216,7 +257,7 @@ module Lunixi
                     end
       error = error_class.new(status: response.status, code: payload['code'],
                               request_id: response.headers['x-request-id'] || response.headers['X-Request-Id'],
-                              retry_after: response.headers['retry-after'])
+                              retry_after: response.headers['retry-after'], details: payload['details'])
       # Running split sessions are successful protocol responses, not completed payments.
       running = %w[COMPOSING AUTHORIZING AWAITING_3DS AWAITING_ACTION AWAITING_CREDIT_APPROVAL AWAITING_REPLACEMENT_CARD AUTHORIZED CAPTURING]
       return payload if running_split && response.status == 400 && running.include?(payload['code']) && payload.dig('data', 'splitPaymentId').is_a?(String)

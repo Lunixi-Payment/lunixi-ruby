@@ -25,3 +25,27 @@ targetRules = ["generic-api-key"]
 paths = ['''(?:^|/)test/fixtures/webhook\-v2\-vectors\.json$''']
 regexTarget = "line"
 regexes = ['''\A\s*\Q{"name":"rotated-previous-secret","secret":"whsec_previous_fedcba9876543210aa","eventId":"7c9e6679-7425-40de-944b-e07fc1f90ae7","timestamp":"2026-08-19T10:00:00.000Z","rawBody":"{\"id\":\"7c9e6679-7425-40de-944b-e07fc1f90ae7\",\"type\":\"payment.captured\",\"sourceService\":\"payment-service\",\"data\":{\"capturedAmountMinor\":\"10050\",\"currency\":\"TRY\"}}","expectedV2":"ae5aea3905e42acc24e8cec2f5b86a218794150d111e76a2e672a94098e23b15"}\E\s*\z'''] # gitleaks:allow
+
+[[allowlists]]
+description = "Synthetic UUID in the shared Physical POS idempotency-key cases only"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(?:^|/)test/fixtures/physical\-pos\-parity\.json$''']
+regexTarget = "secret"
+regexes = ['''\A7b0c6a1e\-2f8d\-4c55\-9a51\-3f0e8d1c2a90\z''']
+
+[[allowlists]]
+description = "Reviewed synthetic idempotency value in an offline test only"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(?:^|/)test/insurance_test\.rb$''']
+regexTarget = "secret"
+regexes = ['''\Ainsurance\-key\-0001\z''']
+
+[[allowlists]]
+description = "Reviewed synthetic idempotency value in an offline test only"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(?:^|/)test/physical_pos_parity_test\.rb$''']
+regexTarget = "secret"
+regexes = ['''\Apos\-parity\-key\-0001\z''']
