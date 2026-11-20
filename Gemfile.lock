@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    lunixi-sdk (2.0.1)
+    lunixi-sdk (2.0.2)
       base64 (>= 0.2, < 1)
       json (>= 2.9, < 3)
       net-http (>= 0.6, < 1)
@@ -164,7 +164,7 @@ GEM
       prettyprint
     prettyprint (0.2.1)
     prism (1.9.0)
-    puma (8.0.2)
+    puma (8.0.4)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.8)
@@ -276,7 +276,7 @@ DEPENDENCIES
   bundler-audit (~> 0.9)
   lunixi-sdk!
   minitest (>= 5.25, < 6)
-  puma (>= 7.1, < 9)
+  puma (>= 8.0.4, < 9)
   rails (~> 8.1)
   rake (~> 13.2)
   rubocop (>= 1.81, < 2)

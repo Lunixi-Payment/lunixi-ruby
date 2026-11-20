@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 — 2026-11-20
+
+- The 2.0.0 and 2.0.1 releases did not reach RubyGems; this version carries the same changes. The Rails sample's development server `puma` moves to 8.0.4 (security advisories in 8.0.2); the gem has no runtime dependency on it.
+
 ## 2.0.1 — 2026-11-20
 
 - The 2.0.0 release did not reach RubyGems; this version carries the same changes. Test and Rails sample style follow RuboCop.
