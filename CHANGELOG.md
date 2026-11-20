@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 — 2026-11-20
+
+- The 2.0.0 release did not reach RubyGems; this version carries the same changes. Test and Rails sample style follow RuboCop.
+
 ## 2.0.0 — 2026-11-20
 
 - **Breaking — order details required.** Every payment endpoint requires the buyer, the billing address and at least one basket item; a `PHYSICAL` item also requires the shipping address (payment providers do not start a payment without them). `payments.create_intent`, `payments.create_marketplace_intent`, `payments.direct_method_payment`, `payments.split`, `marketplace.create_checkout_intent`, the marketplace card charges and `payments.store_card` (buyer and billing address only) raise `ConfigurationError` naming the missing paths before sending; on the checkout intents `buyer.ip` may be left out (the Lunixi form takes it from the browser). `StoreCardRequest` gains `with_buyer` / `with_billing_address`. New `Lunixi::OrderDetails.missing(body, basket:, checkout_intent:)` / `OrderDetails.check!` and constants `ORDER_DETAILS_REQUIRED_FIELDS`, `BUYER_REQUIRED_FIELDS`, `CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS`, `ADDRESS_REQUIRED_FIELDS`, `BASKET_ITEM_REQUIRED_FIELDS`, `OrderFieldErrorCode` (`payment.order.field_required`, `payment.order.field_invalid`), `OrderFieldReason`.

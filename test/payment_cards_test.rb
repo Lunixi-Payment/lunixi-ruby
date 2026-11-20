@@ -82,8 +82,8 @@ class PaymentCardsTest < Minitest::Test
   end
 
   def test_store_card_is_signed_and_requires_an_idempotency_key
-    request = Lunixi::StoreCardRequest.new(CARD, 'card_user_1', 'https://merchant.example/cards/return').with_currency('try')
-                                     .with_buyer(order_details[:buyer]).with_billing_address(order_details[:billingAddress])
+    request = Lunixi::StoreCardRequest.new(CARD, 'card_user_1', 'https://merchant.example/cards/return')
+    request = request.with_currency('try').with_buyer(order_details[:buyer]).with_billing_address(order_details[:billingAddress])
     refute_includes request.inspect, PAN
     @sdk.payments.store_card(request, idempotency_key: idempotency_key)
     sent = @transport.calls.last

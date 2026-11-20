@@ -41,7 +41,7 @@ class CheckoutTest < RailsFlowTest
     sent = @payments.intents.first.first
     assert_equal 'Buyer', sent.dig('buyer', 'surname')
     assert_equal 'Istanbul', sent.dig('billingAddress', 'city')
-    assert_equal ['10050'], sent.fetch('basketItems').map { |item| item['price'] }
+    assert_equal(['10050'], sent.fetch('basketItems').map { |item| item['price'] })
     refute JSON.parse(@order.reload.checkout_request).key?('buyer')
     refute_includes @order.ciphertext_for(:order_details), 'buyer@example.com'
   end
