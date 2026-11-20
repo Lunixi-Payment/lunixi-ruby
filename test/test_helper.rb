@@ -16,9 +16,21 @@ module TestSupport
                        private_key: TEST_KEY.private_to_pem, clock: -> { NOW }, sleeper: ->(_) {}, transport: transport, **)
   end
 
+  # Synthetic order details every payment requires (buyer, billing and shipping address).
+  def order_details
+    address = { contactName: 'Test Buyer', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' }
+    { buyer: { name: 'Test', surname: 'Buyer', identityNumber: '11111111111', email: 'buyer@example.com', gsmNumber: '+905350000000',
+               city: 'Istanbul', country: 'Turkey', zipCode: '34000', ip: '203.0.113.10' },
+      billingAddress: address, shippingAddress: address }
+  end
+
+  def basket_item(price = '10050', **fields)
+    { id: 'item_1', name: 'Test item', category1: 'Test', itemType: 'PHYSICAL', price: price }.merge(fields)
+  end
+
   def payment_body
     { amount: '10050', currency: 'TRY', orderId: 'order_123', callbackUrl: 'https://merchant.example/payment/return',
-      basketItems: [{ id: 'item_1', name: 'Test item', itemType: 'PHYSICAL', price: '10050' }] }
+      basketItems: [basket_item] }.merge(order_details)
   end
 
   def idempotency_key

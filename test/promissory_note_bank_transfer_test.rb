@@ -118,8 +118,15 @@ class PromissoryNoteBankTransferTest < Minitest::Test
     assert_empty @transport.calls
 
     wallet = { paymentMethod: 'WALLET', amount: '5000', wallet: { providerCode: 'wallet_a', gsmNumber: '+905321234567' } }
-    @sdk.payments.split({ totalAmount: '10000', currency: 'TRY', ownerRef: 'owner_1', legs: [card, wallet] }, idempotency_key: idempotency_key)
+    body = { totalAmount: '10000', currency: 'TRY', ownerRef: 'owner_1', legs: [card, wallet], basketItems: [basket_item('10000')] }
+    error = assert_raises(Lunixi::ConfigurationError) { @sdk.payments.split(body, idempotency_key: idempotency_key) }
+    assert_equal 'A split payment requires the order details: buyer, billingAddress, shippingAddress.', error.message
+    assert_empty @transport.calls
+    @sdk.payments.split(body.merge(order_details), idempotency_key: idempotency_key)
     assert_equal '/api/v1/payments/split', @transport.calls.last[:uri].path
+    sent = JSON.parse(@transport.calls.last[:body])
+    assert_empty sent.keys - Lunixi::SPLIT_PAYMENT_FIELDS
+    assert_equal({ 'city' => 'Istanbul' }, sent.fetch('billingAddress').slice('city'))
   end
 
   def test_list_splits_filters

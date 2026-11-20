@@ -25,6 +25,23 @@ class WalletTest < Minitest::Test
     assert call[:headers].key?('X-Signature')
   end
 
+  def test_card_topup_requires_the_buyer_and_billing_address
+    details = order_details
+    request = { creditWalletAccountId: ACCOUNT, amount: '12550', currency: 'TRY' }
+    error = assert_raises(Lunixi::ConfigurationError) { @wallet.topups.start_card(request, idempotency_key: KEY) }
+    assert_equal 'startCardTopup requires buyer, billingAddress.', error.message
+    error = assert_raises(Lunixi::ConfigurationError) do
+      @wallet.topups.start_card(request.merge(buyer: details[:buyer].except(:ip), billing_address: details[:billingAddress]), idempotency_key: KEY)
+    end
+    assert_equal 'A wallet card top-up requires the order details: buyer.ip.', error.message
+    assert_empty api_calls(@transport)
+
+    @wallet.topups.start_card(request.merge(buyer: details[:buyer], billingAddress: details[:billingAddress]), idempotency_key: KEY)
+    call = api_calls(@transport).fetch(0)
+    assert_equal ['POST', '/api/v1/wallet/topups/card'], [call[:method], call[:uri].path]
+    assert_equal %w[creditWalletAccountId amount currency buyer billingAddress], sent_json(call).keys
+  end
+
   def test_reads_are_signed_and_filters_are_checked
     @wallet.end_users.list(programId: 'prog_1', limit: 20)
     call = api_calls(@transport).fetch(0)

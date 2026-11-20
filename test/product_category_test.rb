@@ -20,8 +20,7 @@ class ProductCategoryTest < Minitest::Test
 
   def test_create_intent_sends_product_category_unchanged
     transport = RecordingTransport.new { response }
-    item = { id: 'item_1', name: 'Test item', itemType: 'PHYSICAL', price: '10050',
-             productCategory: Lunixi::ProductCategory::MOBILE_PHONE }
+    item = basket_item(productCategory: Lunixi::ProductCategory::MOBILE_PHONE)
     client(transport: transport).payments.create_intent(payment_body.merge(basketItems: [item]), idempotency_key: idempotency_key)
     sent = JSON.parse(transport.calls.last[:body])
     assert_equal 'MOBILE_PHONE', sent.fetch('basketItems').first.fetch('productCategory')

@@ -4,6 +4,8 @@ module Lunixi
   # Body of POST /api/v1/payments/direct/payment (payments.direct_method_payment). amount is the order
   # total as a positive canonical minor-unit string. Choose the method with with_method_fields or
   # with_card; the provider code and the fields of a method come from payments.list_payment_methods.
+  # The order details are required: with_buyer, with_billing_address, with_basket_items (at least one
+  # item) and with_shipping_address when an item is PHYSICAL (OrderDetails).
   class DirectMethodPaymentRequest
     REQUIRED_FIELDS = %w[paymentMethod amount currency orderId].freeze
 
@@ -147,7 +149,7 @@ module Lunixi
     # Checks a direct/payment body (a Hash or the result of to_h) before sending and returns a
     # string-keyed copy: known fields only, the chosen method's block and no other, card fields only
     # with CARD, block structure, promissory-note plan, shopping-loan basket, no providerCode for
-    # BANK_TRANSFER.
+    # BANK_TRANSFER. payments.direct_method_payment also checks the order details (OrderDetails).
     def self.payload!(body)
       raise ConfigurationError, 'A direct method payment needs a body; use DirectMethodPaymentRequest to build it' unless body.is_a?(Hash)
 

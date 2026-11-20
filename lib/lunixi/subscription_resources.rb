@@ -52,7 +52,9 @@ module Lunixi
       @routes = routes
     end
 
-    # { externalId, email?, name?, phone?, locale?, metadata? }.
+    # { externalId, name, surname, email, gsmNumber, identityNumber, billingAddress, billingCity,
+    # billingCountry, billingZipCode, billingContactName?, shipping* ? }. Renewals take the buyer from
+    # this record; a missing field raises ConfigurationError before sending.
     def upsert(request, idempotency_key: nil)
       @routes.data('customers.upsert', body: request, idempotency_key: idempotency_key)
     end

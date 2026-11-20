@@ -35,9 +35,12 @@ module Lunixi
     # orderId, callbackUrl, basketItems ...) plus the seller legs. Returns the answer as it came (token,
     # checkoutFormContent, paymentId ...); an answer without a token or a form (a seller not eligible
     # under ALL_OR_NOTHING) raises ApiError instead of leaving the buyer on an empty page. The same route
-    # as payments.create_marketplace_intent, which takes the legs inside the body.
+    # as payments.create_marketplace_intent, which takes the legs inside the body. The order details
+    # (buyer, billingAddress, basketItems, shippingAddress for a PHYSICAL item) are required; buyer.ip
+    # may be left out (CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS).
     def create_checkout_intent(request, sellers, multi_seller_policy: MarketplaceMultiSellerPolicy::ALL_OR_NOTHING, idempotency_key: nil)
       body = split_body(payload!(request, 'create_checkout_intent request'), sellers, multi_seller_policy)
+      OrderDetails.check!(body, 'A marketplace payment intent', checkout_intent: true)
       response = @routes.call('createCheckoutIntent', body: body, idempotency_key: idempotency_key)
       intent = RouteResponse.merge_root(response)
       return response if RouteResponse.text(intent['token']) || RouteResponse.text(intent['checkoutFormContent'])
@@ -49,12 +52,13 @@ module Lunixi
     # Direct split card charge from a raw body (amount, currency, orderId, card, buyer, billingAddress,
     # basketItems, sellers, multiSellerPolicy, preauth? ...): POST /payments/marketplace/3d with
     # three_ds: true, /2d otherwise. Prefer charge_marketplace_card2d / charge_marketplace_card3d, which
-    # check the body and the legs.
+    # check the body and the legs. The order details are checked before sending (OrderDetails).
     def charge_marketplace_card(payload, three_ds: false, idempotency_key: nil)
       raise ConfigurationError, "'three_ds' must be true or false." unless [true, false].include?(three_ds)
 
       body = payload!(payload, 'charge_marketplace_card payload')
       charge_amount!(body)
+      OrderDetails.check!(body, 'A marketplace card charge')
       @routes.call(three_ds ? 'chargeMarketplaceCard3d' : 'chargeMarketplaceCard2d', body: body, idempotency_key: idempotency_key)
     end
 

@@ -52,7 +52,8 @@ module Lunixi
       data
     end
 
-    # Body of POST /api/v1/payments/cards: card, cardUserKey, an HTTPS callbackUrl and an optional currency.
+    # Body of POST /api/v1/payments/cards: card, cardUserKey, an HTTPS callbackUrl, the buyer and the
+    # billing address (OrderDetails, no basket) and an optional currency.
     def store_card_body!(body)
       data = plain!(body, 'Store card request')
       raise ConfigurationError, 'Store card request requires the card object' unless data['card'].is_a?(Hash) && !data['card'].empty?
@@ -60,7 +61,7 @@ module Lunixi
       text!(data['cardUserKey'], 'cardUserKey')
       callback_url!(data['callbackUrl'])
       currency!(data['currency']) unless data['currency'].nil?
-      data
+      OrderDetails.check!(data, 'Storing a card', basket: false)
     end
 
     def callback_url!(url)
@@ -124,8 +125,8 @@ module Lunixi
     end
   end
 
-  # Body of payments.store_card (verify and store a card for cardUserKey). Its inspect output never
-  # shows the card.
+  # Body of payments.store_card (verify and store a card for cardUserKey). with_buyer and
+  # with_billing_address are required (no basket). Its inspect output never shows the card.
   class StoreCardRequest
     def initialize(card, card_user_key, callback_url)
       raise ConfigurationError, 'card must be an object' unless card.is_a?(Hash) && !card.empty?
@@ -139,12 +140,32 @@ module Lunixi
       self
     end
 
+    # The card holder as the buyer (required; BUYER_REQUIRED_FIELDS).
+    def with_buyer(value)
+      @payload['buyer'] = object!(value, 'buyer')
+      self
+    end
+
+    # The billing address (required; ADDRESS_REQUIRED_FIELDS).
+    def with_billing_address(value)
+      @payload['billingAddress'] = object!(value, 'billingAddress')
+      self
+    end
+
     def to_h
       @payload.dup
     end
 
     def inspect
       "#<#{self.class.name} card=[REDACTED]>"
+    end
+
+    private
+
+    def object!(value, field)
+      raise ConfigurationError, "#{field} must be an object" unless value.is_a?(Hash)
+
+      JSON.parse(JsonBody.dump(value))
     end
   end
 end

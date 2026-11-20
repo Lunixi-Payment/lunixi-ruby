@@ -35,6 +35,25 @@ class CheckoutTest < RailsFlowTest
     assert_equal 1, @payments.intents.size
   end
 
+  def test_order_details_travel_with_the_intent_outside_the_reserved_request
+    checkout
+    assert_response :ok
+    sent = @payments.intents.first.first
+    assert_equal 'Buyer', sent.dig('buyer', 'surname')
+    assert_equal 'Istanbul', sent.dig('billingAddress', 'city')
+    assert_equal ['10050'], sent.fetch('basketItems').map { |item| item['price'] }
+    refute JSON.parse(@order.reload.checkout_request).key?('buyer')
+    refute_includes @order.ciphertext_for(:order_details), 'buyer@example.com'
+  end
+
+  def test_incomplete_order_details_are_not_reserved
+    @order.update!(order_details: JSON.generate(order_details.except(:billingAddress)))
+    checkout
+    assert_response :service_unavailable
+    assert_empty @payments.intents
+    assert_nil @order.reload.checkout_request
+  end
+
   def test_network_failure_leaves_order_pending_and_reuses_key
     @payments.failure = true
     checkout

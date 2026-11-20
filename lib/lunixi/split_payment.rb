@@ -5,6 +5,11 @@ module Lunixi
   # transfer cannot be split payment legs.
   SPLIT_LEG_BLOCK_FIELDS = %w[mobileBilling wallet promissoryNote].freeze
 
+  # Fields of a split payment body (payments.split). buyer, billingAddress and basketItems are
+  # required, shippingAddress when a basket item is PHYSICAL (OrderDetails).
+  SPLIT_PAYMENT_FIELDS = %w[totalAmount currency ownerRef legs orderId ownerScope callbackUrl
+                            buyer billingAddress shippingAddress basketItems].freeze
+
   # Fields of one split leg.
   SPLIT_PAYMENT_LEG_FIELDS = (%w[paymentMethod cardToken amount force3D installment installmentQuoteToken] + SPLIT_LEG_BLOCK_FIELDS).freeze
 

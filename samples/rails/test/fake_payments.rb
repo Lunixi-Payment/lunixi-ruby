@@ -11,6 +11,7 @@ class FakePayments
   end
 
   def create_intent(body, idempotency_key:)
+    Lunixi::OrderDetails.check!(body, 'A payment intent', checkout_intent: true)
     @intents << [body, idempotency_key]
     raise Lunixi::TransportError, 'synthetic connection failure' if @failure
 

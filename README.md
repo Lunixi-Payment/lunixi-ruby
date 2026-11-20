@@ -60,7 +60,13 @@ result = lunixi.payments.create_intent(
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }],
+    # Order details every payment requires (take them from your checkout, never a placeholder).
+    # buyer.ip may be left out on an intent: the Lunixi form takes it from the buyer's browser.
+    buyer: { name: 'Ada', surname: 'Yilmaz', identityNumber: '11111111111', email: 'ada@example.com',
+             gsmNumber: '+905350000000', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    billingAddress: { contactName: 'Ada Yilmaz', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    shippingAddress: { contactName: 'Ada Yilmaz', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    basketItems: [{ id: 'item-1', name: 'Product', category1: 'Electronics', itemType: 'PHYSICAL', price: "10050" }],
     enabledInstallments: [1, 2, 3] # optional: at most 3 installments
   },
   idempotency_key: order.persisted_payment_attempt_key
@@ -116,6 +122,8 @@ The shared Lunixi form owns enabled payment methods and supports the methods con
 | Marketplace | `marketplace.create_checkout_intent`, `charge_marketplace_card2d`, `charge_marketplace_card3d`, sub-dealers, commissions, payouts, audit log |
 | Other documented endpoints | `request(method, path, body: nil, query: {}, idempotency_key: nil, signed: true, binary: false, accept: 'application/json', max_retries: nil)` |
 
+Every payment body carries the order details (`Lunixi::OrderDetails`): `buyer` (`name`, `surname`, `identityNumber` — Turkish ID or passport number, `email` — ASCII, `gsmNumber`, `city`, `country`, `zipCode`, `ip` — the buyer's browser IP), `billingAddress` (`contactName`, `address`, `city`, `country`, `zipCode`) and at least one `basketItems` entry (`id`, `name`, `category1`, `itemType`, `price`; the prices add up to the amount); a `PHYSICAL` item also needs `shippingAddress`. On `create_intent`, `create_marketplace_intent` and `marketplace.create_checkout_intent` `ip` may be left out (`Lunixi::CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS`): the Lunixi form takes it from the buyer's browser. `create_intent`, `create_marketplace_intent`, `direct_method_payment`, `split`, the marketplace intents and card charges, `store_card` (buyer and billing address only) and `wallet.topups.start_card` (buyer and billing address, `shippingAddress` optional) raise `ConfigurationError` naming the missing paths before sending; `Lunixi::OrderDetails.missing(body)` returns the same list (`buyer.email`, `basketItems.0.category1`, `shippingAddress`). The field lists are `Lunixi::ORDER_DETAILS_REQUIRED_FIELDS`, `Lunixi::BUYER_REQUIRED_FIELDS`, `Lunixi::ADDRESS_REQUIRED_FIELDS` and `Lunixi::BASKET_ITEM_REQUIRED_FIELDS`. The gateway answers a missing field with 400 `payment.order.field_required` and an invalid one with `payment.order.field_invalid` (`Lunixi::OrderFieldErrorCode`, `Lunixi::OrderFieldReason`).
+
 `amount`, split `totalAmount` and each leg/item price must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price`/`paidPrice` are removed fields and rejected even when null. Basket and split totals must agree. Each `basketItems` entry may carry the optional `productCategory`: the Lunixi product category code (for example `'MOBILE_PHONE'`), used by payment methods with legal installment limits (e.g. shopping loan) and other platform features. Leave it out to keep today's behaviour; the gateway rejects an unknown code with 400. The codes are available as `Lunixi::ProductCategory` constants (`Lunixi::ProductCategory::MOBILE_PHONE`, all 40 in `Lunixi::ProductCategory::ALL`); the list only grows by appending, so the value stays a plain string and the SDK does not check it before sending. Intent installments belong to the checkout form; `installment` is rejected on intent creation. The optional `enabledInstallments` list only narrows the installment counts the form offers for one payment (`[1]` = single payment only); the form shows only the counts your panel settings, the card and the platform maximum also allow. Leave it out for no restriction. The list must hold distinct integers 1–36 that include 1; any other list (an empty list included) raises `ConfigurationError` before sending, and the list is sent in ascending order. Set `preauth: true` for authorization, then capture separately with a new durable operation key. Omitting the capture/refund `amount:` keyword asks the gateway to use the remaining amount; explicit nil, numeric, zero, false and noncanonical string amounts are rejected.
 
 ```ruby
@@ -138,6 +146,8 @@ Payments, fraud, payment links, physical POS, wallet, bank accounts, sanctions s
 request = Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', order.reference)
                                             .with_method_fields(Lunixi::PaymentMethod::MOBILE_BILLING, provider_code,
                                                                 gsmNumber: '+905321234567')
+                                            .with_buyer(buyer).with_billing_address(billing_address) # buyer includes ip here
+                                            .with_basket_items(basket_items)
 result = lunixi.payments.direct_method_payment(request, idempotency_key: order.payment_operation_key)
 
 action = result.dig('data', 'action')
@@ -165,7 +175,7 @@ instruction = Lunixi::BankTransferInstruction.from_response(result)
 
 ### Split payments
 
-A non-card split leg carries only one of `Lunixi::SPLIT_LEG_BLOCK_FIELDS` (`mobileBilling`, `wallet`, `promissoryNote`); meal card, open banking, shopping loan and bank transfer cannot be legs and are rejected before sending. `list_splits(status: 'COMPLETED', limit: 25)` lists split payments (`Lunixi::LIST_SPLIT_PAYMENTS_FILTERS`). Webhook names are in `Lunixi::SplitPaymentEvents`; add `Lunixi::SPLIT_LEG_EVENTS_SUBSCRIPTION` to an endpoint's event types to also receive leg events.
+The split body (`Lunixi::SPLIT_PAYMENT_FIELDS`) carries the order details with the legs: `buyer`, `billingAddress`, `basketItems` (adding up to `totalAmount`) and `shippingAddress` for a `PHYSICAL` item. A non-card split leg carries only one of `Lunixi::SPLIT_LEG_BLOCK_FIELDS` (`mobileBilling`, `wallet`, `promissoryNote`); meal card, open banking, shopping loan and bank transfer cannot be legs and are rejected before sending. `list_splits(status: 'COMPLETED', limit: 25)` lists split payments (`Lunixi::LIST_SPLIT_PAYMENTS_FILTERS`). Webhook names are in `Lunixi::SplitPaymentEvents`; add `Lunixi::SPLIT_LEG_EVENTS_SUBSCRIPTION` to an endpoint's event types to also receive leg events.
 
 ### BIN, installments and stored cards
 
@@ -177,7 +187,7 @@ options = lunixi.payments.installment_options(
 )
 ```
 
-`payments.store_card(Lunixi::StoreCardRequest.new(card, card_user_key, callback_url), idempotency_key:)` verifies and stores a card (signed); `list_stored_cards(card_user_key)` and `get_stored_card(token)` return masked card data, and `deactivate_stored_card(token, idempotency_key:)` removes it (signed). Both writes require the idempotency key.
+`payments.store_card(Lunixi::StoreCardRequest.new(card, card_user_key, callback_url).with_buyer(buyer).with_billing_address(billing_address), idempotency_key:)` verifies and stores a card (signed; the card holder as the buyer and the billing address are required); `list_stored_cards(card_user_key)` and `get_stored_card(token)` return masked card data, and `deactivate_stored_card(token, idempotency_key:)` removes it (signed). Both writes require the idempotency key.
 
 `payments.create_marketplace_intent` takes the intent body plus `sellers` (`[{ subDealerId:, amountMinor:, scenario: }]`) and `multiSellerPolicy`. Each `amountMinor` is a canonical minor-unit string and the sellers must add up to `amount`; any other total raises `ConfigurationError` before sending.
 
@@ -324,12 +334,16 @@ record_policy(event['insuranceOrderId'], event['policies']) if event.type == Lun
 ```ruby
 plan = lunixi.subscriptions.plans.create({ productId: product_id, code: 'pro', name: 'Pro', price: '9900', currency: 'TRY',
                                            billing: { frequency: 'MONTHLY' } }, idempotency_key: plan_key)
-customer = lunixi.subscriptions.customers.upsert({ externalId: user.id, email: user.email })
+# Renewals take the buyer from the customer record: identity and billing details are required.
+customer = lunixi.subscriptions.customers.upsert({ externalId: user.id, name: user.first_name, surname: user.last_name, email: user.email,
+                                                   gsmNumber: user.phone, identityNumber: user.identity_number,
+                                                   billingAddress: user.address, billingCity: user.city, billingCountry: user.country,
+                                                   billingZipCode: user.zip_code })
 subscription = lunixi.subscriptions.create({ customerId: customer['id'], planId: plan['id'] }, idempotency_key: signup.key)
 grant_access! if Lunixi::Subscriptions.active?(subscription)
 ```
 
-The subscription, plan, customer, card, invoice and audit-log lists return a `Lunixi::ListPage` whose `next_cursor` goes back as `page_token:` (`page_size` is the envelope's `pageSize`); `iterate` walks every page. `portal.create_sdk_session` returns the embedded-portal proof (`portalToken`, `sessionProof`, `proofNonce`, `proofExpiresAt`); `portal.create_portal_link` returns a hosted link, opened with `Lunixi::Subscriptions.portal_url(link)`. Event names are in `Lunixi::SubscriptionEvents`.
+The subscription, plan, customer, card, invoice and audit-log lists return a `Lunixi::ListPage` whose `next_cursor` goes back as `page_token:` (`page_size` is the envelope's `pageSize`); `iterate` walks every page. `portal.create_sdk_session` returns the embedded-portal proof (`portalToken`, `sessionProof`, `proofNonce`, `proofExpiresAt`); `portal.create_portal_link` returns a hosted link, opened with `Lunixi::Subscriptions.portal_url(link)`. Event names are in `Lunixi::SubscriptionEvents`. A missing or invalid customer field is 400 `subscription.customer.field_required` / `subscription.customer.field_invalid` (`Lunixi::SubscriptionCustomerErrorCode`).
 
 ## KYC and identity signals
 
@@ -349,7 +363,8 @@ approved = Lunixi::Kyc.assurance_meets?(achieved_level, Lunixi::KycAssuranceLeve
 
 ```ruby
 intent = lunixi.marketplace.create_checkout_intent(
-  { amount: '100000', currency: 'TRY', orderId: order.id, callbackUrl: return_url },
+  { amount: '100000', currency: 'TRY', orderId: order.id, callbackUrl: return_url,
+    buyer: buyer, billingAddress: billing_address, basketItems: basket_items }, # order details as in Start checkout
   [{ subDealerId: 'd_alice', amountMinor: '60000' }, { subDealerId: 'd_bob', amountMinor: '40000' }],
   multi_seller_policy: Lunixi::MarketplaceMultiSellerPolicy::ALL_OR_NOTHING, idempotency_key: order.payment_key
 )

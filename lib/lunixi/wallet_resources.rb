@@ -258,9 +258,14 @@ module Lunixi
     end
 
     # Starts a card top-up. Render checkoutFormContent (or follow redirectUrl / threeDsHtml); the wallet is
-    # credited when the payment completes (wallet.topup.completed).
+    # credited when the payment completes (wallet.topup.completed). buyer and billingAddress are required
+    # (OrderDetails, no basket), shippingAddress is optional; a missing field raises ConfigurationError
+    # naming its path before sending.
     def start_card(request, idempotency_key: nil)
-      @invoker.data('startCardTopup', body: request, idempotency_key: idempotency_key)
+      route = WALLET_ROUTES.fetch('startCardTopup')
+      body = RouteRequest.fields!(request || {}, route['required'], route['optional'], 'startCardTopup')
+      OrderDetails.check!(body, 'A wallet card top-up', basket: false)
+      @invoker.data('startCardTopup', body: body, idempotency_key: idempotency_key)
     end
 
     # { operation, history }

@@ -62,7 +62,15 @@ result = lunixi.payments.create_intent(
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }]
+    # Buyer, billing address and basket are required; a PHYSICAL item also needs the shipping address. The buyer IP is optional on an intent: the Lunixi form takes it from the browser.
+    buyer: {
+      name: 'Ada', surname: 'Yılmaz', identityNumber: '11111111111', email: 'ada@example.com',
+      gsmNumber: '+905000000000', city: 'Istanbul', country: 'Turkey', zipCode: '34732'
+    },
+    billingAddress: {
+      contactName: 'Ada Yılmaz', address: 'Altunizade Mah. Örnek Sok. No: 1', city: 'Istanbul', country: 'Turkey', zipCode: '34662'
+    },
+    basketItems: [{ id: 'item-1', name: 'Consulting service', category1: 'Services', itemType: 'VIRTUAL', price: "10050" }]
   },
   idempotency_key: order.persisted_payment_attempt_key
 )
@@ -76,6 +84,8 @@ checkout_token = result.fetch('data').fetch('token')
 > 
 An intent/token, HTTP 2xx, return URL or intermediate split state does not prove capture. Correlate a verified webhook with the persisted order and authenticate a payment status read; confirm final status, amount and currency before fulfillment.
 
+
+Every payment body carries the order details (`Lunixi::OrderDetails`): `buyer` (name, surname, identityNumber, email, gsmNumber, city, country, zipCode and the browser `ip`, optional on the checkout intents), `billingAddress` (contactName, address, city, country, zipCode), at least one `basketItems` entry (id, name, category1, itemType, price) and `shippingAddress` for a `PHYSICAL` item. The SDK raises `ConfigurationError` naming the missing paths before sending; the gateway answers 400 `payment.order.field_required` (`Lunixi::OrderFieldErrorCode`).
 
 Amounts must be positive canonical minor-unit strings within the signed 64-bit fiat range. Root `price` and `paidPrice` are rejected even when null. Basket prices and split leg amounts must equal the relevant total. Each `basketItems` entry may carry the optional `productCategory`: the Lunixi product category code (for example `'MOBILE_PHONE'`), used by payment methods with legal installment limits (e.g. shopping loan) and other platform features. Leave it out to keep today's behaviour; the gateway rejects an unknown code with 400. The codes are available as `Lunixi::ProductCategory` constants (`Lunixi::ProductCategory::MOBILE_PHONE`, all 40 in `Lunixi::ProductCategory::ALL`); the list only grows by appending, so the value stays a plain string and the SDK does not check it before sending. Intent `installment` is rejected because installments are selected in the checkout form; the optional `enabledInstallments` list (distinct integers 1–36 including 1, ascending; `[1]` = single payment only) only narrows the counts the form offers for one payment. `preauth: true` requests authorization; capture is a separate operation.
 

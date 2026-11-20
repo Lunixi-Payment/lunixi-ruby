@@ -54,12 +54,14 @@ module Lunixi
     ALL = [TEST, LIVE].freeze
   end
 
+  # Value of a buyerFields entry (name, email, phone, address, identityNumber). Payment providers
+  # require the buyer, the identity number and the billing address, so the link page always asks all
+  # five fields: REQUIRED is the only value (the gateway answers any other with 400; leaving a field
+  # out means REQUIRED).
   module BuyerFieldRequirement
-    HIDDEN = 'HIDDEN'
-    OPTIONAL = 'OPTIONAL'
     REQUIRED = 'REQUIRED'
 
-    ALL = [HIDDEN, OPTIONAL, REQUIRED].freeze
+    ALL = [REQUIRED].freeze
   end
 
   module CustomFieldType

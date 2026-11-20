@@ -28,10 +28,19 @@ class RailsFlowTest < ActionDispatch::IntegrationTest
     ENV.delete('LUNIXI_BASE_URL')
     LunixiReceipt.delete_all
     Order.delete_all
-    @order = Order.create!(amount_minor: 10_050, currency: 'TRY')
+    @order = Order.create!(amount_minor: 10_050, currency: 'TRY', order_details: JSON.generate(order_details))
     @payments = FakePayments.new
     Rails.configuration.x.lunixi_client = Struct.new(:payments).new(@payments)
     @auth = { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(ENV.fetch('DEMO_USERNAME'), ENV.fetch('DEMO_PASSWORD')) }
+  end
+
+  # Synthetic order details; buyer.ip is left out (the Lunixi form takes it from the browser).
+  def order_details
+    address = { contactName: 'Test Buyer', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' }
+    { buyer: { name: 'Test', surname: 'Buyer', identityNumber: '11111111111', email: 'buyer@example.com', gsmNumber: '+905350000000',
+               city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+      billingAddress: address,
+      basketItems: [{ id: 'item-1', name: 'Test service', category1: 'Services', itemType: 'VIRTUAL', price: '10050' }] }
   end
 
   def checkout

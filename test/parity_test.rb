@@ -22,6 +22,10 @@ class ParityTest < Minitest::Test
   }.freeze
   # Catalog list groups and the Ruby list that must equal them.
   LIST_GROUPS = {
+    'payments' => { 'ORDER_DETAILS_REQUIRED_FIELDS' => Lunixi::ORDER_DETAILS_REQUIRED_FIELDS, 'BUYER_REQUIRED_FIELDS' => Lunixi::BUYER_REQUIRED_FIELDS,
+                    'CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS' => Lunixi::CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS,
+                    'ADDRESS_REQUIRED_FIELDS' => Lunixi::ADDRESS_REQUIRED_FIELDS, 'BASKET_ITEM_REQUIRED_FIELDS' => Lunixi::BASKET_ITEM_REQUIRED_FIELDS,
+                    'SPLIT_PAYMENT_FIELDS' => Lunixi::SPLIT_PAYMENT_FIELDS },
     'wallet' => { 'WALLET_AMOUNT_FIELDS' => Lunixi::WALLET_AMOUNT_FIELDS, 'WalletAccountType.ALL' => Lunixi::WalletAccountType::ALL,
                   'WalletBulkTargetType.ALL' => Lunixi::WalletBulkTargetType::ALL,
                   'WalletCorporateAccountStatus.ALL' => Lunixi::WalletCorporateAccountStatus::ALL,
@@ -73,11 +77,14 @@ class ParityTest < Minitest::Test
   }.freeze
   # Catalog enum groups ({ "NAME": "value" }) and the Ruby module whose String constants must equal them.
   ENUM_GROUPS = {
+    'payments' => { 'OrderFieldErrorCode' => Lunixi::OrderFieldErrorCode, 'OrderFieldReason' => Lunixi::OrderFieldReason },
+    'payment-links' => { 'BuyerFieldRequirement' => Lunixi::BuyerFieldRequirement },
     'subscriptions' => { 'BillingRule' => Lunixi::SubscriptionBillingFrequency, 'ChangePlanRequest' => Lunixi::SubscriptionPlanChangeBehavior,
                          'CollectionMethod' => Lunixi::SubscriptionCollectionMethod, 'InvoiceStatus' => Lunixi::SubscriptionInvoiceStatus,
                          'SubscriptionBillingFrequency' => Lunixi::SubscriptionBillingFrequency,
                          'SubscriptionCardVerificationMode' => Lunixi::SubscriptionCardVerificationMode,
-                         'SubscriptionCollectionMethod' => Lunixi::SubscriptionCollectionMethod, 'SubscriptionEvents' => Lunixi::SubscriptionEvents,
+                         'SubscriptionCollectionMethod' => Lunixi::SubscriptionCollectionMethod,
+                         'SubscriptionCustomerErrorCode' => Lunixi::SubscriptionCustomerErrorCode, 'SubscriptionEvents' => Lunixi::SubscriptionEvents,
                          'SubscriptionInvoiceStatus' => Lunixi::SubscriptionInvoiceStatus,
                          'SubscriptionPlanChangeBehavior' => Lunixi::SubscriptionPlanChangeBehavior,
                          'SubscriptionPortalSdkMode' => Lunixi::SubscriptionPortalSdkMode, 'SubscriptionStatus' => Lunixi::SubscriptionStatus },

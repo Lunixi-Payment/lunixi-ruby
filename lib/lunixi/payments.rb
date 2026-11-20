@@ -24,24 +24,31 @@ module Lunixi
     # that include 1; any other list, an empty one included, raises ConfigurationError before sending,
     # and the list is sent in ascending order.
     #
-    # @param body [Hash] gateway body: +amount+ (canonical minor-unit string), +currency+, +orderId+
-    #   and optional fields such as +callbackUrl+ and +enabledInstallments+
+    # The order details are required (OrderDetails): +buyer+ (+ip+ may be left out here: the Lunixi
+    # form takes it from the buyer's browser), +billingAddress+ and +basketItems+ (at least one; the
+    # prices add up to +amount+); +shippingAddress+ when an item is PHYSICAL. A missing field raises
+    # ConfigurationError naming its path before sending.
+    #
+    # @param body [Hash] gateway body: +amount+ (canonical minor-unit string), +currency+, +orderId+,
+    #   the order details and optional fields such as +callbackUrl+ and +enabledInstallments+
     # @param idempotency_key [String] the persisted key of this checkout attempt
     # @return [Hash] Unmodified gateway response envelope; creation is not settlement.
     def create_intent(body, idempotency_key:)
       body = payment_body!(body)
       raise ConfigurationError, 'Intent installments are selected in the checkout form' if body.key?('installment')
 
+      OrderDetails.check!(body, 'A payment intent', checkout_intent: true)
       client.request('POST', "#{BASE}/intents", body: body, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 
     # Create a marketplace intent (POST /payments/marketplace/intents, signed): the intent body plus
     # sellers [{ subDealerId, amountMinor, scenario }] and multiSellerPolicy. Each amountMinor is a
     # canonical minor-unit string and the sellers must add up to amount; any other total raises
-    # ConfigurationError before sending.
+    # ConfigurationError before sending. The order details follow the rule of create_intent.
     def create_marketplace_intent(body, idempotency_key:)
       data = payment_body!(body)
       sellers!(data['sellers'], data['amount'])
+      OrderDetails.check!(data, 'A marketplace payment intent', checkout_intent: true)
       client.request('POST', "#{BASE}/marketplace/intents", body: data, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 
@@ -64,7 +71,8 @@ module Lunixi
     end
 
     # Verify and store a card for a cardUserKey (POST /payments/cards, signed). Build the body with
-    # StoreCardRequest or pass a raw Hash; the idempotency key is required.
+    # StoreCardRequest or pass a raw Hash; the idempotency key is required. The buyer (the card holder)
+    # and the billing address are required (OrderDetails, no basket).
     def store_card(body_or_request, idempotency_key: nil)
       body = CardRules.store_card_body!(body_or_request)
       client.request('POST', "#{BASE}/cards", body: body, idempotency_key: Client.idempotency_key!(idempotency_key))
@@ -115,11 +123,13 @@ module Lunixi
     alias list_payment_methods methods
 
     # Start a payment with any method from the merchant server (POST /payments/direct/payment). Build
-    # the body with DirectMethodPaymentRequest or pass a raw Hash; both are checked before sending.
+    # the body with DirectMethodPaymentRequest or pass a raw Hash; both are checked before sending,
+    # the order details (OrderDetails) included.
     # When the buyer must act, data.action says how (PaymentActionType); a BANK_TRANSFER payment
     # answers with a DISPLAY action read by BankTransferInstruction.from_response.
     def direct_method_payment(body_or_request, idempotency_key: nil)
       body = body_or_request.is_a?(DirectMethodPaymentRequest) ? body_or_request.to_h : DirectMethodPaymentRequest.payload!(body_or_request)
+      OrderDetails.check!(body, 'A direct method payment')
       client.request('POST', "#{BASE}/direct/payment", body: body, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 
@@ -189,7 +199,9 @@ module Lunixi
       client.request('POST', "#{BASE}/#{identifier!(payment_id)}/void", idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 
-    # Start a 1–5 leg split payment; running statuses are returned, never marked paid.
+    # Start a 1–5 leg split payment; running statuses are returned, never marked paid. The body
+    # (SPLIT_PAYMENT_FIELDS) carries the order details: buyer, billingAddress, basketItems and
+    # shippingAddress for a PHYSICAL item; a missing field raises ConfigurationError before sending.
     def split(body, idempotency_key:)
       data = normalize!(body)
       minor!(data['totalAmount'])
@@ -206,6 +218,7 @@ module Lunixi
       end
       raise ConfigurationError, 'Split leg amounts must equal totalAmount' unless total == data['totalAmount'].to_i
 
+      OrderDetails.check!(data, 'A split payment')
       client.request('POST', "#{BASE}/split", body: data, idempotency_key: Client.idempotency_key!(idempotency_key))
     end
 

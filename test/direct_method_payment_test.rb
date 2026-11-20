@@ -16,6 +16,18 @@ class DirectMethodPaymentTest < Minitest::Test
     { paymentMethod: 'WALLET', amount: '10000', currency: 'TRY', orderId: 'order_1', wallet: { providerCode: 'wallet_a', gsmNumber: '+905321234567' } }
   end
 
+  # A raw body with the order details every payment requires; the body's own keys win.
+  def order(body)
+    { basketItems: [basket_item('10000')] }.merge(order_details).merge(body)
+  end
+
+  # A request builder with the order details.
+  def ordered(request)
+    details = order_details
+    request.with_buyer(details[:buyer]).with_billing_address(details[:billingAddress]).with_shipping_address(details[:shippingAddress])
+           .with_basket_items([basket_item('10000')])
+  end
+
   def pay(body, key = idempotency_key)
     @sdk.payments.direct_method_payment(body, idempotency_key: key)
   end
@@ -27,17 +39,18 @@ class DirectMethodPaymentTest < Minitest::Test
   def test_bank_transfer_request_builds_the_documented_body
     request = Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1')
                                                 .with_method_fields(Lunixi::PaymentMethod::BANK_TRANSFER, nil, bankCode: '0062')
-    pay(request)
+    pay(ordered(request))
     sent = @transport.calls.last
     assert_equal '/api/v1/payments/direct/payment', sent[:uri].path
-    assert_equal '{"paymentMethod":"BANK_TRANSFER","amount":"10000","currency":"TRY","orderId":"order_1","bankTransfer":{"bankCode":"0062"}}', sent[:body]
+    assert sent[:body].start_with?('{"paymentMethod":"BANK_TRANSFER","amount":"10000","currency":"TRY","orderId":"order_1","buyer":')
+    assert_equal({ 'bankCode' => '0062' }, JSON.parse(sent[:body])['bankTransfer'])
     refute_includes sent[:body], 'providerCode'
     assert_equal idempotency_key, sent[:headers]['Idempotency-Key']
     assert sent[:headers].key?('X-Signature')
   end
 
   def test_bank_transfer_other_banks_code_and_raw_body
-    pay(bank_transfer_body.merge(bankTransfer: { bankCode: Lunixi::BANK_TRANSFER_OTHER_BANKS_CODE }))
+    pay(order(bank_transfer_body.merge(bankTransfer: { bankCode: Lunixi::BANK_TRANSFER_OTHER_BANKS_CODE })))
     assert_equal({ 'bankCode' => '9999' }, JSON.parse(@transport.calls.last[:body])['bankTransfer'])
   end
 
@@ -71,10 +84,10 @@ class DirectMethodPaymentTest < Minitest::Test
 
   def test_idempotency_key_is_required
     [nil, '', 'short'].each do |key|
-      assert_raises(Lunixi::ConfigurationError) { pay(wallet_body, key) }
+      assert_raises(Lunixi::ConfigurationError) { pay(order(wallet_body), key) }
     end
     assert_empty @transport.calls
-    pay(wallet_body)
+    pay(order(wallet_body))
     assert_equal 'wallet_a', JSON.parse(@transport.calls.last[:body]).dig('wallet', 'providerCode')
   end
 
@@ -92,9 +105,9 @@ class DirectMethodPaymentTest < Minitest::Test
   end
 
   def test_shopping_loan_requires_one_to_one_hundred_basket_items
-    item = { id: 'item_1', name: 'Phone', itemType: 'PHYSICAL', price: '100', productCategory: 'MOBILE_PHONE' }
-    body = { paymentMethod: 'SHOPPING_LOAN', amount: '10000', currency: 'TRY', orderId: 'order_1', shoppingLoan: { providerCode: 'loan_a' } }
-    assert_rejected(body)
+    item = basket_item('100', name: 'Phone', productCategory: 'MOBILE_PHONE')
+    body = order(paymentMethod: 'SHOPPING_LOAN', amount: '10000', currency: 'TRY', orderId: 'order_1', shoppingLoan: { providerCode: 'loan_a' })
+    assert_rejected(body.except(:basketItems))
     assert_rejected(body.merge(basketItems: []))
     assert_rejected(body.merge(basketItems: Array.new(101) { item }))
     assert_empty @transport.calls
@@ -115,7 +128,7 @@ class DirectMethodPaymentTest < Minitest::Test
     assert_empty @transport.calls
     fields = { address: { provinceCode: '06', districtCode: '1234', line: 'Street 1' }, people: Array.new(10) { { name: 'x', age: 30 } },
                note: 'x' * 1024, consent: true }
-    pay(Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1').with_method_fields('WALLET', 'wallet_a', fields))
+    pay(ordered(Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1').with_method_fields('WALLET', 'wallet_a', fields)))
     assert_equal 10, JSON.parse(@transport.calls.last[:body]).dig('wallet', 'people').size
   end
 
@@ -136,12 +149,25 @@ class DirectMethodPaymentTest < Minitest::Test
     assert_raises(Lunixi::ConfigurationError) { Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1').with_promissory_note_schedule(long) }
     assert_empty @transport.calls
 
-    pay(base.merge(promissoryNote: { providerCode: 'note_a', schedule: rows }))
+    pay(order(base.merge(promissoryNote: { providerCode: 'note_a', schedule: rows })))
     assert_equal 2, JSON.parse(@transport.calls.last[:body]).dig('promissoryNote', 'schedule').size
     request = Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1')
                                                 .with_method_fields('PROMISSORY_NOTE', 'note_a', debtorName: 'Buyer').with_promissory_note_count(3)
-    pay(request)
+    pay(ordered(request))
     assert_equal({ 'providerCode' => 'note_a', 'debtorName' => 'Buyer', 'noteCount' => '3' }, JSON.parse(@transport.calls.last[:body])['promissoryNote'])
+  end
+
+  def test_order_details_are_required_before_sending
+    error = assert_raises(Lunixi::ConfigurationError) { pay(wallet_body) }
+    assert_equal 'A direct method payment requires the order details: buyer, billingAddress, basketItems.', error.message
+    details = order_details
+    body = order(wallet_body).merge(buyer: details[:buyer].except(:ip), shippingAddress: nil)
+    error = assert_raises(Lunixi::ConfigurationError) { pay(body) }
+    assert_equal 'A direct method payment requires the order details: buyer.ip, shippingAddress.', error.message
+    request = Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', 'order_1').with_method_fields('WALLET', 'wallet_a', {})
+    assert_equal 'WALLET', request.to_h['paymentMethod']
+    assert_raises(Lunixi::ConfigurationError) { pay(request) }
+    assert_empty @transport.calls
   end
 
   def test_confirm_and_resend_payment_action

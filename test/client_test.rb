@@ -116,8 +116,9 @@ class ClientTest < Minitest::Test
     payload = { code: 'AWAITING_ACTION', data: { splitPaymentId: 'split_1', status: 'AWAITING_ACTION' } }
     transport = RecordingTransport.new { response(400, payload) }
     sdk = client(transport: transport)
-    split = sdk.payments.split({ totalAmount: '100', currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: '100', cardToken: 'stored_token' }] },
-                               idempotency_key: idempotency_key)
+    body = { totalAmount: '100', currency: 'TRY', ownerRef: 'owner_1', legs: [{ amount: '100', cardToken: 'stored_token' }],
+             basketItems: [basket_item('100')] }.merge(order_details)
+    split = sdk.payments.split(body, idempotency_key: idempotency_key)
     assert_equal 'AWAITING_ACTION', split.dig('data', 'status')
     assert_raises(Lunixi::ValidationError) { sdk.payments.get('pay_1') }
   end

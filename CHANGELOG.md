@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 — 2026-11-20
+
+- **Breaking — order details required.** Every payment endpoint requires the buyer, the billing address and at least one basket item; a `PHYSICAL` item also requires the shipping address (payment providers do not start a payment without them). `payments.create_intent`, `payments.create_marketplace_intent`, `payments.direct_method_payment`, `payments.split`, `marketplace.create_checkout_intent`, the marketplace card charges and `payments.store_card` (buyer and billing address only) raise `ConfigurationError` naming the missing paths before sending; on the checkout intents `buyer.ip` may be left out (the Lunixi form takes it from the browser). `StoreCardRequest` gains `with_buyer` / `with_billing_address`. New `Lunixi::OrderDetails.missing(body, basket:, checkout_intent:)` / `OrderDetails.check!` and constants `ORDER_DETAILS_REQUIRED_FIELDS`, `BUYER_REQUIRED_FIELDS`, `CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS`, `ADDRESS_REQUIRED_FIELDS`, `BASKET_ITEM_REQUIRED_FIELDS`, `OrderFieldErrorCode` (`payment.order.field_required`, `payment.order.field_invalid`), `OrderFieldReason`.
+- Split payment bodies carry `buyer`, `billingAddress`, `shippingAddress` and `basketItems`; their field list is `Lunixi::SPLIT_PAYMENT_FIELDS`.
+- Wallet card top-up (`wallet.topups.start_card`): `buyer` and `billingAddress` are required, `shippingAddress` optional; a missing field raises `ConfigurationError` before sending (the gateway answers 400 `payment.order.field_required` with `details.fields`).
+- **Breaking — subscription customers.** `subscriptions.customers.upsert` requires `name`, `surname`, `email`, `gsmNumber`, `identityNumber`, `billingAddress`, `billingCity`, `billingCountry`, `billingZipCode` (renewals take the buyer from this record); `phone`, `locale` and `metadata` were never accepted by the gateway and are removed from the route. New constant `Lunixi::SubscriptionCustomerErrorCode`.
+- **Breaking — payment link buyer fields.** `Lunixi::BuyerFieldRequirement` has only `REQUIRED`: the link page always asks all five buyer fields (the gateway answers `HIDDEN` / `OPTIONAL` with 400).
+- Rails sample: `Order.order_details` (encrypted, migration `20261120000000_add_order_details_to_orders`) carries the buyer, addresses and basket; checkout checks them before reserving an attempt and sends them with the intent outside the reserved request.
+
 ## 1.3.1 — 2026-11-15
 
 - Lint (RuboCop) clean and `Gemfile.lock` carries the gem version, so the release builds in CI; no behaviour change.

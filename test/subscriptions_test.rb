@@ -146,8 +146,24 @@ class SubscriptionsTest < Minitest::Test
     assert_equal 'idem-retry-1', retry_charge[:headers]['Idempotency-Key']
   end
 
+  def customer
+    { externalId: 'u-42', name: 'Test', surname: 'Customer', email: 'customer@example.com', gsmNumber: '+905350000000',
+      identityNumber: '11111111111', billingAddress: 'Example Street 1', billingCity: 'Istanbul', billingCountry: 'Turkey',
+      billingZipCode: '34000' }
+  end
+
+  def test_customer_upsert_requires_the_buyer_and_billing_details
+    error = assert_raises(Lunixi::ConfigurationError) { @subscriptions.customers.upsert({ externalId: 'u-42', email: 'customer@example.com' }) }
+    assert_includes error.message, 'gsmNumber'
+    %i[phone locale metadata].each do |field|
+      assert_raises(Lunixi::ConfigurationError) { @subscriptions.customers.upsert(customer.merge(field => 'x')) }
+    end
+    assert_empty api_calls(@transport)
+    assert_equal %w[subscription.customer.field_required subscription.customer.field_invalid], Lunixi::SubscriptionCustomerErrorCode::ALL
+  end
+
   def test_customers
-    @subscriptions.customers.upsert({ externalId: 'u-42', email: 'customer@example.com' }, idempotency_key: 'idem-cus-1')
+    @subscriptions.customers.upsert(customer.merge(shippingCity: 'Ankara'), idempotency_key: 'idem-cus-1')
     @subscriptions.customers.get_by_external_id('u-42')
     @subscriptions.customers.adjust_credit('cus_1', { amountMinor: '500', currency: 'TRY', type: 'GRANT' })
     upsert, lookup, adjust = api_calls(@transport)

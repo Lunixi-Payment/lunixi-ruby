@@ -37,6 +37,8 @@ class CheckoutFlow
       metadata = requested_mode == 'hosted' ? { allowedOrigin: 'https://pay.lunixi.com' } : {}
       payload = { amount: @order.amount_minor.to_s, currency: @order.currency, orderId: @order.public_id,
                   callbackUrl: callback, metadata: metadata }
+      # Checked before the reservation: an incomplete order never becomes a stored attempt.
+      Lunixi::OrderDetails.check!(payload.merge(@order.order_details_payload), 'A checkout', checkout_intent: true)
       @order.update!(checkout_mode: requested_mode, checkout_request: JSON.generate(payload), checkout_started_at: Time.current)
     end
   end
@@ -57,7 +59,9 @@ class CheckoutFlow
     age = @order.checkout_started_at && (Time.current - @order.checkout_started_at)
     raise Lunixi::Error, 'Retry window expired; reconcile checkout' unless age&.between?(-300, (23 * 3600) - 1)
 
-    payload = reserved_payload
+    # Order details travel with the intent but stay outside the reserved request: a corrected address
+    # or phone number reuses the attempt instead of stranding it.
+    payload = reserved_payload.merge(@order.order_details_payload)
     response = LunixiConnection.client.payments.create_intent(payload, idempotency_key: @order.checkout_key).fetch('data')
     token = response.fetch('token')
     Lunixi::Checkout.browser_config(token)

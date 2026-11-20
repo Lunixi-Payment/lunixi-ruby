@@ -58,13 +58,21 @@ Toplamı sunucuda hesaplayın. Çağrıdan **önce** ödeme denemesine bir UUID 
 result = lunixi.payments.create_intent(
   { amount: "10050", currency: 'TRY', orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'urun-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }],
+    # Her ödemenin istediği sipariş bilgileri (ödeme sayfanızdan alın, yer tutucu kullanmayın).
+    # Intent'te buyer.ip gönderilmeyebilir: Lunixi formu IP'yi alıcının tarayıcısından alır.
+    buyer: { name: 'Ada', surname: 'Yilmaz', identityNumber: '11111111111', email: 'ada@example.com',
+             gsmNumber: '+905350000000', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    billingAddress: { contactName: 'Ada Yilmaz', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    shippingAddress: { contactName: 'Ada Yilmaz', address: 'Example Street 1', city: 'Istanbul', country: 'Turkey', zipCode: '34000' },
+    basketItems: [{ id: 'urun-1', name: 'Product', category1: 'Electronics', itemType: 'PHYSICAL', price: "10050" }],
     enabledInstallments: [1, 2, 3] }, # isteğe bağlı: en fazla 3 taksit
   idempotency_key: order.persisted_payment_attempt_key
 )
 intent_id = result.fetch('data').fetch('paymentId')
 checkout_token = result.fetch('data').fetch('token')
 ```
+
+Her ödeme gövdesi sipariş bilgilerini taşır (`Lunixi::OrderDetails`): `buyer` (`name`, `surname`, `identityNumber` — T.C. kimlik veya pasaport numarası, `email` — ASCII, `gsmNumber`, `city`, `country`, `zipCode`, `ip` — alıcının tarayıcı IP'si), `billingAddress` (`contactName`, `address`, `city`, `country`, `zipCode`) ve en az bir `basketItems` satırı (`id`, `name`, `category1`, `itemType`, `price`; fiyatların toplamı tutara eşittir); `PHYSICAL` bir satır `shippingAddress` de ister. `create_intent`, `create_marketplace_intent` ve `marketplace.create_checkout_intent` çağrılarında `ip` gönderilmeyebilir (`Lunixi::CHECKOUT_INTENT_BUYER_OPTIONAL_FIELDS`): Lunixi formu IP'yi alıcının tarayıcısından alır. `create_intent`, `create_marketplace_intent`, `direct_method_payment`, `split`, pazaryeri intent'leri ve kart tahsilatları, `store_card` (yalnız alıcı ve fatura adresi) ve `wallet.topups.start_card` (alıcı ve fatura adresi, `shippingAddress` isteğe bağlı) eksik alanların yollarını sayan bir `ConfigurationError` ile göndermeden önce durur; `Lunixi::OrderDetails.missing(body)` aynı listeyi döndürür (`buyer.email`, `basketItems.0.category1`, `shippingAddress`). Alan listeleri `Lunixi::ORDER_DETAILS_REQUIRED_FIELDS`, `Lunixi::BUYER_REQUIRED_FIELDS`, `Lunixi::ADDRESS_REQUIRED_FIELDS` ve `Lunixi::BASKET_ITEM_REQUIRED_FIELDS` sabitlerindedir. Gateway eksik alanı 400 `payment.order.field_required`, geçersiz alanı `payment.order.field_invalid` ile yanıtlar (`Lunixi::OrderFieldErrorCode`, `Lunixi::OrderFieldReason`).
 
 `"10050"`, 100,50 TRY’nin kuruş karşılığıdır. Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır; sayısal değerler kabul edilmez. Eski kök `price`/`paidPrice` alanları null olsa bile reddedilir. Sepet toplamı ve split bacak toplamı ana tutarla aynı olmalıdır. Her `basketItems` satırı isteğe bağlı `productCategory` alanını taşıyabilir: Lunixi ürün kategorisi kodu (ör. `'MOBILE_PHONE'`); yasal taksit sınırı olan ödeme yöntemleri (ör. alışveriş kredisi) ve diğer platform özellikleri tarafından kullanılır. Alanı göndermezseniz mevcut davranış korunur; gateway bilinmeyen kodu 400 ile reddeder. Kodlar `Lunixi::ProductCategory` sabitleri olarak hazırdır (`Lunixi::ProductCategory::MOBILE_PHONE`, 40 kodun tamamı `Lunixi::ProductCategory::ALL` içinde); liste yalnız sona ekleme ile büyüdüğünden değer düz string olarak kalır ve SDK göndermeden önce denetlemez. Intent’te `installment` gönderilmez; taksiti ödeme formu seçtirir. İsteğe bağlı `enabledInstallments` listesi, bir ödeme için formun sunacağı taksit sayılarını yalnızca daraltır (`[1]` = yalnız tek çekim); form, panel ayarlarınızın, kartın ve platform üst sınırının da izin verdiği sayıları gösterir. Kısıt istemiyorsanız alanı göndermeyin. Liste 1–36 arası, tekrarsız ve 1'i içeren tamsayılardan oluşmalıdır; başka bir liste (boş liste dahil) göndermeden önce `ConfigurationError` oluşturur ve liste artan sırada gönderilir. `preauth: true` ile provizyon alınabilir; capture ayrı işlem ve anahtarla yapılır.
 
@@ -129,6 +137,8 @@ banks = lunixi.request('GET', '/api/v1/bank-connect/banks', query: { limit: 20 }
 request = Lunixi::DirectMethodPaymentRequest.new('10000', 'TRY', order.reference)
                                             .with_method_fields(Lunixi::PaymentMethod::MOBILE_BILLING, provider_code,
                                                                 gsmNumber: '+905321234567')
+                                            .with_buyer(buyer).with_billing_address(billing_address) # buyer burada ip içerir
+                                            .with_basket_items(basket_items)
 result = lunixi.payments.direct_method_payment(request, idempotency_key: order.payment_operation_key)
 
 action = result.dig('data', 'action')
@@ -156,7 +166,7 @@ Yanıtta `DISPLAY` transfer talimatı yoksa `from_response` nil döndürür. Ge�
 
 ### Parçalı ödeme
 
-Kart dışı bir parça `Lunixi::SPLIT_LEG_BLOCK_FIELDS` alanlarından (`mobileBilling`, `wallet`, `promissoryNote`) yalnız birini taşır; yemek kartı, açık bankacılık, alışveriş kredisi ve Para Transferi parça olamaz ve göndermeden önce reddedilir. `list_splits(status: 'COMPLETED', limit: 25)` parçalı ödemeleri listeler (`Lunixi::LIST_SPLIT_PAYMENTS_FILTERS`). Webhook adları `Lunixi::SplitPaymentEvents` içindedir; parça olaylarını da almak için uç noktanın olay türlerine `Lunixi::SPLIT_LEG_EVENTS_SUBSCRIPTION` ekleyin.
+Çoklu ödeme gövdesi (`Lunixi::SPLIT_PAYMENT_FIELDS`) parçalarla birlikte sipariş bilgilerini taşır: `buyer`, `billingAddress`, `basketItems` (toplamı `totalAmount`) ve `PHYSICAL` bir satır için `shippingAddress`. Kart dışı bir parça `Lunixi::SPLIT_LEG_BLOCK_FIELDS` alanlarından (`mobileBilling`, `wallet`, `promissoryNote`) yalnız birini taşır; yemek kartı, açık bankacılık, alışveriş kredisi ve Para Transferi parça olamaz ve göndermeden önce reddedilir. `list_splits(status: 'COMPLETED', limit: 25)` parçalı ödemeleri listeler (`Lunixi::LIST_SPLIT_PAYMENTS_FILTERS`). Webhook adları `Lunixi::SplitPaymentEvents` içindedir; parça olaylarını da almak için uç noktanın olay türlerine `Lunixi::SPLIT_LEG_EVENTS_SUBSCRIPTION` ekleyin.
 
 ### BIN, taksitler ve saklı kartlar
 
@@ -168,7 +178,7 @@ options = lunixi.payments.installment_options(
 )
 ```
 
-`payments.store_card(Lunixi::StoreCardRequest.new(card, card_user_key, callback_url), idempotency_key:)` bir kartı doğrular ve saklar (imzalı); `list_stored_cards(card_user_key)` ve `get_stored_card(token)` maskelenmiş kart verisini döndürür, `deactivate_stored_card(token, idempotency_key:)` kartı kaldırır (imzalı). İki yazım da idempotency anahtarı ister.
+`payments.store_card(Lunixi::StoreCardRequest.new(card, card_user_key, callback_url).with_buyer(buyer).with_billing_address(billing_address), idempotency_key:)` bir kartı doğrular ve saklar (imzalı; alıcı olarak kart sahibi ve fatura adresi zorunludur); `list_stored_cards(card_user_key)` ve `get_stored_card(token)` maskelenmiş kart verisini döndürür, `deactivate_stored_card(token, idempotency_key:)` kartı kaldırır (imzalı). İki yazım da idempotency anahtarı ister.
 
 `payments.create_marketplace_intent` intent gövdesine ek olarak `sellers` (`[{ subDealerId:, amountMinor:, scenario: }]`) ve `multiSellerPolicy` alır. Her `amountMinor` kanonik küçük birim string'idir ve satıcıların toplamı `amount` değerine eşit olmalıdır; başka bir toplam göndermeden önce `ConfigurationError` oluşturur.
 
@@ -315,12 +325,16 @@ record_policy(event['insuranceOrderId'], event['policies']) if event.type == Lun
 ```ruby
 plan = lunixi.subscriptions.plans.create({ productId: product_id, code: 'pro', name: 'Pro', price: '9900', currency: 'TRY',
                                            billing: { frequency: 'MONTHLY' } }, idempotency_key: plan_key)
-customer = lunixi.subscriptions.customers.upsert({ externalId: user.id, email: user.email })
+# Yenilemeler alıcıyı müşteri kaydından alır: kimlik ve fatura bilgileri zorunludur.
+customer = lunixi.subscriptions.customers.upsert({ externalId: user.id, name: user.first_name, surname: user.last_name, email: user.email,
+                                                   gsmNumber: user.phone, identityNumber: user.identity_number,
+                                                   billingAddress: user.address, billingCity: user.city, billingCountry: user.country,
+                                                   billingZipCode: user.zip_code })
 subscription = lunixi.subscriptions.create({ customerId: customer['id'], planId: plan['id'] }, idempotency_key: signup.key)
 grant_access! if Lunixi::Subscriptions.active?(subscription)
 ```
 
-Abonelik, plan, müşteri, kart, fatura ve denetim kaydı listeleri, `next_cursor` değeri `page_token:` olarak geri gönderilen bir `Lunixi::ListPage` döndürür (`page_size` zarfın `pageSize` değeridir); `iterate` bütün sayfaları gezer. `portal.create_sdk_session` gömülü portal kanıtını döndürür (`portalToken`, `sessionProof`, `proofNonce`, `proofExpiresAt`); `portal.create_portal_link` barındırılan bir link döndürür, link `Lunixi::Subscriptions.portal_url(link)` ile açılır. Olay adları `Lunixi::SubscriptionEvents` içindedir.
+Abonelik, plan, müşteri, kart, fatura ve denetim kaydı listeleri, `next_cursor` değeri `page_token:` olarak geri gönderilen bir `Lunixi::ListPage` döndürür (`page_size` zarfın `pageSize` değeridir); `iterate` bütün sayfaları gezer. `portal.create_sdk_session` gömülü portal kanıtını döndürür (`portalToken`, `sessionProof`, `proofNonce`, `proofExpiresAt`); `portal.create_portal_link` barındırılan bir link döndürür, link `Lunixi::Subscriptions.portal_url(link)` ile açılır. Olay adları `Lunixi::SubscriptionEvents` içindedir. Eksik veya geçersiz müşteri alanı 400 `subscription.customer.field_required` / `subscription.customer.field_invalid` ile yanıtlanır (`Lunixi::SubscriptionCustomerErrorCode`).
 
 ## KYC ve kimlik sinyalleri
 
@@ -340,7 +354,8 @@ approved = Lunixi::Kyc.assurance_meets?(achieved_level, Lunixi::KycAssuranceLeve
 
 ```ruby
 intent = lunixi.marketplace.create_checkout_intent(
-  { amount: '100000', currency: 'TRY', orderId: order.id, callbackUrl: return_url },
+  { amount: '100000', currency: 'TRY', orderId: order.id, callbackUrl: return_url,
+    buyer: buyer, billingAddress: billing_address, basketItems: basket_items }, # sipariş bilgileri, Ödeme başlatma örneğindeki gibi
   [{ subDealerId: 'd_alice', amountMinor: '60000' }, { subDealerId: 'd_bob', amountMinor: '40000' }],
   multi_seller_policy: Lunixi::MarketplaceMultiSellerPolicy::ALL_OR_NOTHING, idempotency_key: order.payment_key
 )

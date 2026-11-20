@@ -82,9 +82,12 @@ module Lunixi
     'getOperation' => route.call('GET', '/operations/:operationId', idempotency_key: false),
     'getOperationReceipt' => route.call('GET', '/operations/:operationId/receipt', idempotency_key: false),
 
+    # The payment provider requires the buyer (buyer.ip: the user's browser IP) and the billing address;
+    # a missing field is 400 payment.order.field_required with the paths in details.fields.
     'startCardTopup' => route.call('POST', '/topups/card',
-                                   idempotency_key: true, required: %w[creditWalletAccountId amount currency],
-                                   optional: %w[fundingMerchantId savedCardUserKey savedCardToken savedConsumerToken savedPublicCardStorageToken returnUrl]),
+                                   idempotency_key: true, required: %w[creditWalletAccountId amount currency buyer billingAddress],
+                                   optional: %w[fundingMerchantId savedCardUserKey savedCardToken savedConsumerToken savedPublicCardStorageToken
+                                                returnUrl shippingAddress]),
     'getTopup' => route.call('GET', '/topups/:operationId', idempotency_key: false),
     # The gateway DTO marks approverPrincipal optional, but the wallet service refuses the refund without
     # it (400 WALLET_VALIDATION): it is required in practice.

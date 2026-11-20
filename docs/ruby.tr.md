@@ -62,7 +62,15 @@ result = lunixi.payments.create_intent(
     currency: 'TRY',
     orderId: order.public_id,
     callbackUrl: 'https://merchant.example/payments/return',
-    basketItems: [{ id: 'item-1', name: 'Product', itemType: 'PHYSICAL', price: "10050" }]
+    # Alıcı, fatura adresi ve sepet zorunludur; PHYSICAL bir satır teslimat adresi de ister. Intent'te alıcı IP'si isteğe bağlıdır: Lunixi formu IP'yi tarayıcıdan alır.
+    buyer: {
+      name: 'Ada', surname: 'Yılmaz', identityNumber: '11111111111', email: 'ada@example.com',
+      gsmNumber: '+905000000000', city: 'Istanbul', country: 'Turkey', zipCode: '34732'
+    },
+    billingAddress: {
+      contactName: 'Ada Yılmaz', address: 'Altunizade Mah. Örnek Sok. No: 1', city: 'Istanbul', country: 'Turkey', zipCode: '34662'
+    },
+    basketItems: [{ id: 'item-1', name: 'Consulting service', category1: 'Services', itemType: 'VIRTUAL', price: "10050" }]
   },
   idempotency_key: order.persisted_payment_attempt_key
 )
@@ -76,6 +84,8 @@ checkout_token = result.fetch('data').fetch('token')
 > 
 Intent/token, HTTP 2xx, dönüş sayfası veya ara split durumu tahsilat kanıtı değildir. İmzalı webhook’u kalıcı siparişle eşleştirin; sunucudan ödeme sorgusunda nihai durum, tutar ve para birimi uyuşmadan siparişi tamamlamayın.
 
+
+Her ödeme gövdesi sipariş bilgilerini taşır (`Lunixi::OrderDetails`): `buyer` (name, surname, identityNumber, email, gsmNumber, city, country, zipCode ve checkout intent'lerinde isteğe bağlı tarayıcı `ip` değeri), `billingAddress` (contactName, address, city, country, zipCode), en az bir `basketItems` satırı (id, name, category1, itemType, price) ve `PHYSICAL` bir satır için `shippingAddress`. SDK eksik alanların yollarını sayan bir `ConfigurationError` ile göndermeden önce durur; gateway 400 `payment.order.field_required` ile yanıtlar (`Lunixi::OrderFieldErrorCode`).
 
 Tutarlar pozitif, kanonik alt birim string olmalı ve işaretli 64 bit fiat aralığında kalmalıdır. Kök `price`/`paidPrice` null olsa bile reddedilir. Sepet ve split bacak toplamları ana toplamla aynı olmalıdır. Her `basketItems` satırı isteğe bağlı `productCategory` alanını taşıyabilir: Lunixi ürün kategorisi kodu (ör. `'MOBILE_PHONE'`); yasal taksit sınırı olan ödeme yöntemleri (ör. alışveriş kredisi) ve diğer platform özellikleri tarafından kullanılır. Alanı göndermezseniz mevcut davranış korunur; gateway bilinmeyen kodu 400 ile reddeder. Kodlar `Lunixi::ProductCategory` sabitleri olarak hazırdır (`Lunixi::ProductCategory::MOBILE_PHONE`, 40 kodun tamamı `Lunixi::ProductCategory::ALL` içinde); liste yalnız sona ekleme ile büyüdüğünden değer düz string olarak kalır ve SDK göndermeden önce denetlemez. Intent’te `installment` gönderilmez; taksit formda seçilir. İsteğe bağlı `enabledInstallments` listesi (1–36 arası, tekrarsız, 1'i içeren, artan sıralı tamsayılar; `[1]` = yalnız tek çekim) bir ödeme için formun sunacağı sayıları yalnızca daraltır. `preauth: true` provizyon ister; capture ayrı işlemdir.
 

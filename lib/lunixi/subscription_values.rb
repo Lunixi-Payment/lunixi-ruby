@@ -41,6 +41,13 @@ module Lunixi
     ALL = [DRAFT, OPEN, PAID, UNCOLLECTIBLE, VOID].freeze
   end
 
+  # Errors of customers.upsert: a missing or invalid customer field (details.field).
+  module SubscriptionCustomerErrorCode
+    FIELD_REQUIRED = 'subscription.customer.field_required'
+    FIELD_INVALID = 'subscription.customer.field_invalid'
+    ALL = [FIELD_REQUIRED, FIELD_INVALID].freeze
+  end
+
   # How invoices are collected (collectionMethod): the saved card is charged each cycle (AUTO_CHARGE,
   # the default), the invoice is finalised but not charged (SEND_INVOICE), or collection is up to you
   # (MANUAL).
@@ -157,8 +164,14 @@ module Lunixi
     'plans.translations' => route.call('GET', "#{subscriptions_base}/plans/:planId/translations"),
     'plans.upsertTranslation' => route.call('PATCH', "#{subscriptions_base}/plans/:planId/translations/:locale", free: true),
 
+    # Renewals take the buyer from this record: identity and billing details are required (400
+    # subscription.customer.field_required).
     'customers.upsert' => route.call('PUT', "#{subscriptions_base}/customers",
-                                     idempotency_key: 'optional', required: %w[externalId], optional: %w[email name phone locale metadata]),
+                                     idempotency_key: 'optional',
+                                     required: %w[externalId name surname email gsmNumber identityNumber billingAddress billingCity billingCountry
+                                                  billingZipCode],
+                                     optional: %w[billingContactName shippingContactName shippingAddress shippingCity shippingCountry
+                                                  shippingZipCode]),
     'customers.get' => route.call('GET', "#{subscriptions_base}/customers/:customerId"),
     'customers.getByExternalId' => route.call('GET', "#{subscriptions_base}/customers/by-external/:externalId"),
     'customers.list' => route.call('GET', "#{subscriptions_base}/customers", query: %w[search includeArchived] + cursor_query),

@@ -20,8 +20,14 @@ class MarketplaceTest < Minitest::Test
   def charge_request(amount = '100000')
     { amount: amount, currency: 'TRY', orderId: 'ORD-MP-1',
       card: { cardHolderName: 'Test Buyer', cardNumber: TEST_CARD_NUMBER, expireMonth: '12', expireYear: '30', cvcNumber: '123' },
-      buyer: { name: 'Test', surname: 'Buyer' }, billingAddress: { city: 'Istanbul' },
-      basketItems: [{ id: 'SKU-1', name: 'Item', category1: 'Demo', itemType: 'PHYSICAL', price: amount }] }
+      basketItems: [basket_item(amount, id: 'SKU-1')] }.merge(order_details)
+  end
+
+  # A checkout intent body: buyer.ip may be left out (the Lunixi form takes it from the browser).
+  def intent_request(amount, order_id)
+    details = order_details
+    { amount: amount, currency: 'TRY', orderId: order_id, basketItems: [basket_item(amount)] }
+      .merge(details, buyer: details[:buyer].except(:ip))
   end
 
   def test_only_the_split_charges_are_signed
@@ -33,8 +39,7 @@ class MarketplaceTest < Minitest::Test
   end
 
   def test_create_checkout_intent_sends_the_signed_split
-    intent = @marketplace.create_checkout_intent({ amount: '100000', currency: 'TRY', orderId: 'WC-7' }, legs,
-                                                 idempotency_key: idempotency_key)
+    intent = @marketplace.create_checkout_intent(intent_request('100000', 'WC-7'), legs, idempotency_key: idempotency_key)
     assert_equal 'tok_1', intent['token']
     call = api_calls(@transport).fetch(0)
     assert_equal ['POST', '/api/v1/payments/marketplace/intents'], [call[:method], call[:uri].path]
@@ -49,13 +54,13 @@ class MarketplaceTest < Minitest::Test
   def test_an_intent_without_a_token_raises
     @answer = { 'success' => false, 'code' => 'marketplace.payment.seller_not_eligible', 'message' => 'seller not eligible' }
     error = assert_raises(Lunixi::ApiError) do
-      @marketplace.create_checkout_intent({ amount: '1000', currency: 'TRY', orderId: 'o_1' }, [{ subDealerId: 'd_1', amountMinor: '1000' }])
+      @marketplace.create_checkout_intent(intent_request('1000', 'o_1'), [{ subDealerId: 'd_1', amountMinor: '1000' }])
     end
     assert_equal 'marketplace.payment.seller_not_eligible', error.code
   end
 
   def test_seller_legs_are_checked_before_sending
-    intent = { amount: '1000', currency: 'TRY', orderId: 'o_1' }
+    intent = intent_request('1000', 'o_1')
     [
       -> { @marketplace.create_checkout_intent(intent, []) },
       -> { @marketplace.create_checkout_intent(intent, [{ subDealerId: 'd_1', amountMinor: '0' }, { subDealerId: 'd_2', amountMinor: '1000' }]) },
@@ -68,6 +73,22 @@ class MarketplaceTest < Minitest::Test
     ].each { |call| assert_raises(Lunixi::ConfigurationError) { call.call } }
     error = assert_raises(Lunixi::ConfigurationError) { @marketplace.create_checkout_intent(intent, [{ subDealerId: 'd_1', amountMinor: '999' }]) }
     assert_match(/add up to 999/, error.message)
+    error = assert_raises(Lunixi::ConfigurationError) do
+      @marketplace.create_checkout_intent(intent.except(:basketItems), [{ subDealerId: 'd_1', amountMinor: '1000' }])
+    end
+    assert_equal 'A marketplace payment intent requires the order details: basketItems.', error.message
+    assert_empty api_calls(@transport)
+  end
+
+  def test_card_charges_require_the_order_details
+    details = order_details
+    buyer = details[:buyer].except(:ip)
+    error = assert_raises(Lunixi::ConfigurationError) { @marketplace.charge_marketplace_card2d(charge_request.merge(buyer: buyer), legs) }
+    assert_equal 'A marketplace card charge requires the order details: buyer.ip.', error.message
+    error = assert_raises(Lunixi::ConfigurationError) do
+      @marketplace.charge_marketplace_card(charge_request.except(:shippingAddress).merge(sellers: legs, multiSellerPolicy: 'ALL_OR_NOTHING'))
+    end
+    assert_equal 'A marketplace card charge requires the order details: shippingAddress.', error.message
     assert_empty api_calls(@transport)
   end
 

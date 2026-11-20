@@ -22,7 +22,7 @@ class PaymentCardsTest < Minitest::Test
   def marketplace_body
     { amount: '10000', currency: 'TRY', orderId: 'order_1', callbackUrl: 'https://merchant.example/return',
       sellers: [{ subDealerId: 'seller_1', amountMinor: '6000' }, { subDealerId: 'seller_2', amountMinor: '4000', scenario: 'PRODUCT' }],
-      multiSellerPolicy: 'ALL_OR_NOTHING' }
+      multiSellerPolicy: 'ALL_OR_NOTHING', basketItems: [basket_item('10000')] }.merge(order_details)
   end
 
   def test_bin_info_posts_the_bin_without_a_signature
@@ -83,11 +83,12 @@ class PaymentCardsTest < Minitest::Test
 
   def test_store_card_is_signed_and_requires_an_idempotency_key
     request = Lunixi::StoreCardRequest.new(CARD, 'card_user_1', 'https://merchant.example/cards/return').with_currency('try')
+                                     .with_buyer(order_details[:buyer]).with_billing_address(order_details[:billingAddress])
     refute_includes request.inspect, PAN
     @sdk.payments.store_card(request, idempotency_key: idempotency_key)
     sent = @transport.calls.last
     assert_equal ['POST', '/api/v1/payments/cards'], [sent[:method], sent[:uri].path]
-    assert_equal %w[card cardUserKey callbackUrl currency], JSON.parse(sent[:body]).keys
+    assert_equal %w[card cardUserKey callbackUrl currency buyer billingAddress], JSON.parse(sent[:body]).keys
     assert_equal idempotency_key, sent[:headers]['Idempotency-Key']
     assert sent[:headers].key?('X-Signature')
   end
@@ -95,9 +96,13 @@ class PaymentCardsTest < Minitest::Test
   def test_store_card_local_errors_send_nothing_and_never_echo_the_card
     calls = gateway_calls.size
     error = assert_raises(Lunixi::ConfigurationError) do
-      @sdk.payments.store_card({ card: CARD, cardUserKey: 'card_user_1', callbackUrl: 'https://merchant.example/r' })
+      @sdk.payments.store_card({ card: CARD, cardUserKey: 'card_user_1', callbackUrl: 'https://merchant.example/r' }.merge(order_details))
     end
     refute_includes error.message, PAN
+    error = assert_raises(Lunixi::ConfigurationError) do
+      @sdk.payments.store_card({ card: CARD, cardUserKey: 'card_user_1', callbackUrl: 'https://merchant.example/r' }, idempotency_key: idempotency_key)
+    end
+    assert_equal 'Storing a card requires the order details: buyer, billingAddress.', error.message
     [{ card: CARD, callbackUrl: 'https://merchant.example/r' },
      { card: CARD, cardUserKey: 'card_user_1', callbackUrl: 'http://merchant.example/r' },
      { card: {}, cardUserKey: 'card_user_1', callbackUrl: 'https://merchant.example/r' }].each do |body|
@@ -150,7 +155,15 @@ class PaymentCardsTest < Minitest::Test
       assert_raises(Lunixi::ConfigurationError) { @sdk.payments.create_marketplace_intent(body, idempotency_key: idempotency_key) }
     end
     assert_raises(Lunixi::ConfigurationError) { @sdk.payments.create_marketplace_intent(marketplace_body, idempotency_key: 'short') }
+    error = assert_raises(Lunixi::ConfigurationError) do
+      @sdk.payments.create_marketplace_intent(marketplace_body.except(:billingAddress), idempotency_key: idempotency_key)
+    end
+    assert_equal 'A marketplace payment intent requires the order details: billingAddress.', error.message
     assert_equal calls, gateway_calls.size
+
+    buyer = order_details[:buyer].except(:ip)
+    @sdk.payments.create_marketplace_intent(marketplace_body.merge(buyer: buyer), idempotency_key: idempotency_key)
+    refute last_body['buyer'].key?('ip')
   end
 
   def test_analytics_routes
